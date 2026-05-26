@@ -43,6 +43,13 @@ appsettings.local.json
 appsettings.Development.json
 .env
 
+# Firebase & Secrets
+firebase-private-key.json
+firebase-token-generator.html
+
+# Database seeds (local/demo data)
+seed_*.sql
+
 # OS
 .DS_Store
 Thumbs.db
