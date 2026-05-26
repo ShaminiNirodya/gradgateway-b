@@ -1,3 +1,4 @@
+using GradGateway.Business.DTOs;
 using GradGateway.Business.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -44,6 +45,24 @@ public class ProjectsController : ControllerBase
         {
             var result = await _service.GetMyProjectByIdAsync(uid, id);
             return result == null ? NotFound(new { message = "Project not found" }) : Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CreateProjectDto dto)
+    {
+        var uid = GetFirebaseUid();
+        if (string.IsNullOrWhiteSpace(uid)) 
+            return Unauthorized(new { message = "Invalid token" });
+
+        try
+        {
+            var result = await _service.CreateProjectAsync(uid, dto);
+            return Ok(result);
         }
         catch (InvalidOperationException ex)
         {

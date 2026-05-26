@@ -58,6 +58,30 @@ public class ProjectService : IProjectService
         return row == null ? null : ToResponse(row, student.FullName);
     }
 
+    public async Task<ProjectResponseDto> CreateProjectAsync(string firebaseUid, CreateProjectDto dto)
+    {
+        var student = await GetStudentProfileAsync(firebaseUid);
+
+        var project = new Project
+        {
+            Id = Guid.NewGuid(),
+            StudentProfileId = student.Id,
+            Title = dto.Title,
+            Description = dto.Description,
+            TechStack = dto.TechStack,
+            RepositoryUrl = dto.RepositoryUrl,
+            DemoUrl = dto.DemoUrl,
+            IsPublic = dto.IsPublic,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.Projects.Add(project);
+        await _context.SaveChangesAsync();
+
+        return ToResponse(project, student.FullName);
+    }
+
     private async Task<StudentProfile> GetStudentProfileAsync(string firebaseUid)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid);

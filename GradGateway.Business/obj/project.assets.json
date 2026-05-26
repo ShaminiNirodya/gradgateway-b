@@ -2771,11 +2771,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\University App\\GradGateway\\GradGateway.Business\\GradGateway.Business.csproj",
+      "projectUniqueName": "d:\\University App\\gradgateway-b\\GradGateway.Business\\GradGateway.Business.csproj",
       "projectName": "GradGateway.Business",
-      "projectPath": "D:\\University App\\GradGateway\\GradGateway.Business\\GradGateway.Business.csproj",
+      "projectPath": "d:\\University App\\gradgateway-b\\GradGateway.Business\\GradGateway.Business.csproj",
       "packagesPath": "C:\\Users\\DELL\\.nuget\\packages\\",
-      "outputPath": "D:\\University App\\GradGateway\\GradGateway.Business\\obj\\",
+      "outputPath": "d:\\University App\\gradgateway-b\\GradGateway.Business\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -2797,8 +2797,8 @@
         "net9.0": {
           "targetAlias": "net9.0",
           "projectReferences": {
-            "D:\\University App\\GradGateway\\GradGateway.Data\\GradGateway.Data.csproj": {
-              "projectPath": "D:\\University App\\GradGateway\\GradGateway.Data\\GradGateway.Data.csproj"
+            "d:\\University App\\gradgateway-b\\GradGateway.Data\\GradGateway.Data.csproj": {
+              "projectPath": "d:\\University App\\gradgateway-b\\GradGateway.Data\\GradGateway.Data.csproj"
             }
           }
         }
