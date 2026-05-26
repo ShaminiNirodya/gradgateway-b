@@ -1,0 +1,10 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\GradGateway.Api",
+    "\\GradGateway.Business",
+    "\\GradGateway.Data"
+  ],
+  "SelectedNode": "\\GradGateway.Api\\Program.cs",
+  "PreviewInSolutionExplorer": false
+}

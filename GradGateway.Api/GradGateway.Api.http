@@ -1,0 +1,6 @@
+@GradGateway.Api_HostAddress = http://localhost:5160
+
+GET {{GradGateway.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
