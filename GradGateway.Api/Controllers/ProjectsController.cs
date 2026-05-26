@@ -70,6 +70,30 @@ public class ProjectsController : ControllerBase
         }
     }
 
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateProjectDto dto)
+    {
+        var uid = GetFirebaseUid();
+        if (string.IsNullOrWhiteSpace(uid)) 
+            return Unauthorized(new { message = "Invalid token" });
+
+        try
+        {
+            var result = await _service.UpdateProjectAsync(uid, id, dto);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERROR] UpdateProjectAsync failed: {ex.GetType().Name} - {ex.Message}");
+            Console.WriteLine($"[ERROR] Stack trace: {ex.StackTrace}");
+            return StatusCode(500, new { message = $"Internal server error: {ex.Message}", type = ex.GetType().Name });
+        }
+    }
+
     private string? GetFirebaseUid()
         => User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("user_id")?.Value;
 }

@@ -11,5 +11,6 @@ public record ProjectResponseDto(
     string? DemoUrl,
     bool IsPublic,
     DateTime CreatedAt,
-    DateTime UpdatedAt
+    DateTime UpdatedAt,
+    List<ProjectImageDto>? Images = null
 );

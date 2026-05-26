@@ -18,6 +18,7 @@ public class GradGatewayDbContext : DbContext
     public DbSet<Message> Messages { get; set; }
     public DbSet<Notification> Notifications { get; set; }
     public DbSet<Project> Projects { get; set; }
+    public DbSet<ProjectImage> ProjectImages { get; set; }
     public DbSet<Skill> Skills { get; set; }
     public DbSet<StudentSkill> StudentSkills { get; set; }
     public DbSet<Interview> Interviews { get; set; }

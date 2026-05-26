@@ -4,6 +4,7 @@ using GradGateway.Data.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GradGateway.Data.Migrations
 {
     [DbContext(typeof(GradGatewayDbContext))]
-    partial class GradGatewayDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260526124006_AddProjectImages")]
+    partial class AddProjectImages
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -874,11 +877,11 @@ namespace GradGateway.Data.Migrations
                     b.Property<int>("DisplayOrder")
                         .HasColumnType("int");
 
-                    b.Property<string>("ImageMimeType")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ImageUrl")
+                    b.Property<byte[]>("ImageData")
                         .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("ImageMimeType")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid>("ProjectId")

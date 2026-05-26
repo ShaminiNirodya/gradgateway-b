@@ -26,6 +26,7 @@ public class ProjectService : IProjectService
         };
 
         var rows = await _context.Projects
+            .Include(p => p.Images)
             .Where(p => p.StudentProfileId == student.Id)
             .Where(p =>
                 !demoRepoUrls.Contains(p.RepositoryUrl ?? string.Empty) &&
@@ -48,6 +49,7 @@ public class ProjectService : IProjectService
         };
 
         var row = await _context.Projects
+            .Include(p => p.Images)
             .FirstOrDefaultAsync(p =>
                 p.Id == projectId &&
                 p.StudentProfileId == student.Id &&
@@ -76,10 +78,132 @@ public class ProjectService : IProjectService
             UpdatedAt = DateTime.UtcNow
         };
 
+        // Add images if provided
+        if (dto.Images != null && dto.Images.Count > 0)
+        {
+            for (int i = 0; i < dto.Images.Count; i++)
+            {
+                var imageDto = dto.Images[i];
+                try
+                {
+                    var projectImage = new ProjectImage
+                    {
+                        Id = Guid.NewGuid(),
+                        ProjectId = project.Id,
+                        ImageUrl = imageDto.Url, // Firebase Storage URL
+                        ImageMimeType = imageDto.MimeType,
+                        DisplayOrder = i,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    project.Images.Add(projectImage);
+                }
+                catch (Exception ex)
+                {
+                    // Log error but continue with other images
+                    Console.WriteLine($"Failed to process image {i}: {ex.Message}");
+                }
+            }
+        }
+
         _context.Projects.Add(project);
         await _context.SaveChangesAsync();
 
         return ToResponse(project, student.FullName);
+    }
+
+    public async Task<ProjectResponseDto> UpdateProjectAsync(string firebaseUid, Guid projectId, UpdateProjectDto dto)
+    {
+        var student = await GetStudentProfileAsync(firebaseUid);
+
+        var project = await _context.Projects
+            .Include(p => p.Images)
+            .FirstOrDefaultAsync(p => p.Id == projectId && p.StudentProfileId == student.Id);
+
+        if (project == null)
+            throw new InvalidOperationException("Project not found.");
+
+        try
+        {
+            // Update basic fields
+            project.Title = dto.Title;
+            project.Description = dto.Description;
+            project.TechStack = dto.TechStack;
+            project.RepositoryUrl = dto.RepositoryUrl;
+            project.DemoUrl = dto.DemoUrl;
+            project.IsPublic = dto.IsPublic;
+            project.UpdatedAt = DateTime.UtcNow;
+
+            // Handle image deletions - delete from DB first
+            if (dto.DeleteImageIds != null && dto.DeleteImageIds.Count > 0)
+            {
+                var imagesToDelete = await _context.ProjectImages
+                    .Where(img => dto.DeleteImageIds.Contains(img.Id) && img.ProjectId == projectId)
+                    .ToListAsync();
+                
+                foreach (var image in imagesToDelete)
+                {
+                    _context.ProjectImages.Remove(image);
+                }
+            }
+
+            // Save changes for deletions and basic field updates
+            await _context.SaveChangesAsync();
+
+            // Reload to get fresh state
+            project = await _context.Projects
+                .Include(p => p.Images)
+                .FirstOrDefaultAsync(p => p.Id == projectId);
+
+            if (project == null)
+                throw new InvalidOperationException("Project was deleted or no longer accessible.");
+
+            // Handle new image additions
+            if (dto.NewImages != null && dto.NewImages.Count > 0)
+            {
+                var maxDisplayOrder = project.Images.Any() ? project.Images.Max(img => img.DisplayOrder) : -1;
+
+                for (int i = 0; i < dto.NewImages.Count; i++)
+                {
+                    var imageDto = dto.NewImages[i];
+                    var projectImage = new ProjectImage
+                    {
+                        Id = Guid.NewGuid(),
+                        ProjectId = project.Id,
+                        ImageUrl = imageDto.Url,
+                        ImageMimeType = imageDto.MimeType,
+                        DisplayOrder = maxDisplayOrder + i + 1,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    _context.ProjectImages.Add(projectImage);
+                }
+
+                // Save new images
+                await _context.SaveChangesAsync();
+            }
+
+            // Reload final state
+            project = await _context.Projects
+                .Include(p => p.Images)
+                .FirstOrDefaultAsync(p => p.Id == projectId);
+
+            if (project == null)
+                throw new InvalidOperationException("Project was deleted or no longer accessible.");
+
+            return ToResponse(project, student.FullName);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            Console.WriteLine($"[ERROR] Concurrency conflict during project update: {ex.Message}");
+            throw new InvalidOperationException("Project was modified by another user. Please refresh and try again.", ex);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERROR] Failed to update project: {ex.GetType().Name} - {ex.Message}");
+            Console.WriteLine($"[ERROR] Stack trace: {ex.StackTrace}");
+            throw;
+        }
     }
 
     private async Task<StudentProfile> GetStudentProfileAsync(string firebaseUid)
@@ -97,6 +221,15 @@ public class ProjectService : IProjectService
 
     private static ProjectResponseDto ToResponse(Project p, string studentName)
     {
+        var images = p.Images
+            .OrderBy(img => img.DisplayOrder)
+            .Select(img => new ProjectImageDto(
+                img.Id,
+                img.ImageUrl, // Firebase Storage URL - no conversion needed
+                img.DisplayOrder
+            ))
+            .ToList();
+
         return new ProjectResponseDto(
             p.Id,
             p.StudentProfileId,
@@ -108,7 +241,8 @@ public class ProjectService : IProjectService
             p.DemoUrl,
             p.IsPublic,
             p.CreatedAt,
-            p.UpdatedAt
+            p.UpdatedAt,
+            images
         );
     }
 }
