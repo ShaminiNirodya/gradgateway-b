@@ -94,6 +94,27 @@ public class ProjectsController : ControllerBase
         }
     }
 
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var uid = GetFirebaseUid();
+        if (string.IsNullOrWhiteSpace(uid))
+            return Unauthorized(new { message = "Invalid token" });
+
+        try
+        {
+            var result = await _service.DeleteProjectAsync(uid, id);
+            if (!result)
+                return NotFound(new { message = "Project not found or unauthorized" });
+            
+            return Ok(new { message = "Project deleted successfully" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     private string? GetFirebaseUid()
         => User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("user_id")?.Value;
 }

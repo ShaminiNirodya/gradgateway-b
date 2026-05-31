@@ -206,6 +206,30 @@ public class ProjectService : IProjectService
         }
     }
 
+    public async Task<bool> DeleteProjectAsync(string firebaseUid, Guid projectId)
+    {
+        var student = await GetStudentProfileAsync(firebaseUid);
+
+        var project = await _context.Projects
+            .Include(p => p.Images)
+            .FirstOrDefaultAsync(p => p.Id == projectId && p.StudentProfileId == student.Id);
+
+        if (project == null)
+            return false;
+
+        // Remove all associated images first
+        if (project.Images.Any())
+        {
+            _context.ProjectImages.RemoveRange(project.Images);
+        }
+
+        // Remove the project
+        _context.Projects.Remove(project);
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
     private async Task<StudentProfile> GetStudentProfileAsync(string firebaseUid)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid);

@@ -71,6 +71,7 @@ public class StudentService : IStudentService
                 StudentId = ResolveStudentId(dto.StudentId, user.Id),
                 Degree = dto.Degree,
                 GradYear = gradYear,
+                CurrentYear = dto.CurrentYear,
                 Gpa = gpa,
                 CertificationsJson = SerializeStringList(dto.Certifications),
                 AwardsJson = SerializeStringList(dto.Awards),
@@ -90,6 +91,7 @@ public class StudentService : IStudentService
                 : dto.StudentId.Trim();
             profile.Degree = dto.Degree;
             profile.GradYear = gradYear;
+            profile.CurrentYear = dto.CurrentYear;
             profile.Gpa = gpa;
             if (dto.Certifications != null)
             {
@@ -121,6 +123,7 @@ public class StudentService : IStudentService
             profile.StudentId,
             profile.Degree,
             profile.GradYear,
+            profile.CurrentYear,
             profile.Gpa,
             DeserializeStringList(profile.CertificationsJson),
             DeserializeStringList(profile.AwardsJson)
@@ -179,6 +182,7 @@ public class StudentService : IStudentService
             profile.StudentId,
             profile.Degree,
             profile.GradYear,
+            profile.CurrentYear,
             profile.Gpa,
             DeserializeStringList(profile.CertificationsJson),
             DeserializeStringList(profile.AwardsJson)
@@ -335,6 +339,7 @@ public class StudentService : IStudentService
                 s.University,
                 s.Degree,
                 s.GradYear,
+                s.CurrentYear,
                 s.Gpa,
                 s.User.Email,
                 skillText

@@ -8,4 +8,5 @@ public interface IProjectService
     Task<ProjectResponseDto?> GetMyProjectByIdAsync(string firebaseUid, Guid projectId);
     Task<ProjectResponseDto> CreateProjectAsync(string firebaseUid, CreateProjectDto dto);
     Task<ProjectResponseDto> UpdateProjectAsync(string firebaseUid, Guid projectId, UpdateProjectDto dto);
+    Task<bool> DeleteProjectAsync(string firebaseUid, Guid projectId);
 }

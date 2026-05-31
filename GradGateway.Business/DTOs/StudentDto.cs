@@ -10,6 +10,7 @@ public record StudentRegistrationDto(
     string? StudentId,
     string Degree,
     string GradYear,
+    int CurrentYear,
     string Gpa,
     IReadOnlyList<string>? Certifications = null,
     IReadOnlyList<string>? Awards = null
@@ -25,6 +26,7 @@ public record StudentProfileResponseDto(
     string StudentId,
     string Degree,
     int GradYear,
+    int CurrentYear,
     decimal Gpa,
     IReadOnlyList<string> Certifications,
     IReadOnlyList<string> Awards
@@ -36,6 +38,7 @@ public record StudentDirectoryItemDto(
     string University,
     string Degree,
     int GradYear,
+    int CurrentYear,
     decimal Gpa,
     string Email,
     string Skills

@@ -1064,6 +1064,9 @@ namespace GradGateway.Data.Migrations
                     b.Property<int>("GradYear")
                         .HasColumnType("int");
 
+                    b.Property<int>("CurrentYear")
+                        .HasColumnType("int");
+
                     b.Property<string>("Phone")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -1100,6 +1103,7 @@ namespace GradGateway.Data.Migrations
                         {
                             Id = new Guid("bbbbbbbb-1111-2222-3333-444444444444"),
                             CreatedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CurrentYear = 3,
                             Degree = "BSc (Hons) in IT",
                             FullName = "Demo Student",
                             Gpa = 3.45m,
@@ -1114,6 +1118,7 @@ namespace GradGateway.Data.Migrations
                         {
                             Id = new Guid("bbbbbbbb-1111-2222-3333-555555555555"),
                             CreatedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CurrentYear = 4,
                             Degree = "BSc Engineering",
                             FullName = "Nethmi Perera",
                             Gpa = 3.82m,
@@ -1128,6 +1133,7 @@ namespace GradGateway.Data.Migrations
                         {
                             Id = new Guid("bbbbbbbb-1111-2222-3333-666666666666"),
                             CreatedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CurrentYear = 4,
                             Degree = "BSc (Hons) in Computer Science",
                             FullName = "Sahan Jayasinghe",
                             Gpa = 3.67m,
@@ -1142,6 +1148,7 @@ namespace GradGateway.Data.Migrations
                         {
                             Id = new Guid("bbbbbbbb-1111-2222-3333-777777777777"),
                             CreatedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CurrentYear = 3,
                             Degree = "BSc in Information Technology",
                             FullName = "Tharushi Senanayake",
                             Gpa = 3.29m,
