@@ -30,6 +30,7 @@ public class Opportunity
     public decimal? MonthlyStipendLkr { get; set; }
     public DateTime DeadlineAt { get; set; }
     public bool IsActive { get; set; } = true;
+    public bool DeadlineNotificationSent { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

@@ -45,6 +45,7 @@ appsettings.Development.json
 
 # Firebase & Secrets
 firebase-private-key.json
+*firebase-adminsdk*.json
 firebase-token-generator.html
 
 # Database seeds (local/demo data)

@@ -4686,11 +4686,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\University App\\gradgateway-b\\GradGateway.Data\\GradGateway.Data.csproj",
+      "projectUniqueName": "d:\\University App\\gradgateway-b\\GradGateway.Data\\GradGateway.Data.csproj",
       "projectName": "GradGateway.Data",
-      "projectPath": "D:\\University App\\gradgateway-b\\GradGateway.Data\\GradGateway.Data.csproj",
+      "projectPath": "d:\\University App\\gradgateway-b\\GradGateway.Data\\GradGateway.Data.csproj",
       "packagesPath": "C:\\Users\\DELL\\.nuget\\packages\\",
-      "outputPath": "D:\\University App\\gradgateway-b\\GradGateway.Data\\obj\\",
+      "outputPath": "d:\\University App\\gradgateway-b\\GradGateway.Data\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

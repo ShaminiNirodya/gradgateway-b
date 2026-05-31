@@ -25,12 +25,16 @@ public class ApplicationService : IApplicationService
         if (student == null)
             throw new InvalidOperationException("Student profile not found.");
 
+        var todayUtc = DateTime.UtcNow.Date;
         var opportunity = await _context.Opportunities
             .Include(o => o.CompanyProfile)
-            .FirstOrDefaultAsync(o => o.Id == dto.OpportunityId && o.IsActive);
+            .FirstOrDefaultAsync(o => o.Id == dto.OpportunityId);
 
-        if (opportunity == null)
+        if (opportunity == null || !opportunity.IsActive)
             throw new ArgumentException("Opportunity not found.");
+
+        if (opportunity.DeadlineAt.Date < todayUtc)
+            throw new ArgumentException("This job post has expired and is no longer accepting applications.");
 
         var existing = await _context.Applications
             .FirstOrDefaultAsync(a => a.OpportunityId == dto.OpportunityId && a.StudentProfileId == student.Id);

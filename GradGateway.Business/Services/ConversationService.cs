@@ -9,10 +9,12 @@ namespace GradGateway.Business.Services;
 public class ConversationService : IConversationService
 {
     private readonly GradGatewayDbContext _context;
+    private readonly IRealtimeNotificationService? _realtimeNotification;
 
-    public ConversationService(GradGatewayDbContext context)
+    public ConversationService(GradGatewayDbContext context, IRealtimeNotificationService? realtimeNotification = null)
     {
         _context = context;
+        _realtimeNotification = realtimeNotification;
     }
 
     public async Task<ConversationResponseDto> StartConversationAsync(string firebaseUid, StartConversationRequestDto dto)
@@ -234,7 +236,7 @@ public class ConversationService : IConversationService
 
         await _context.SaveChangesAsync();
 
-        return new MessageResponseDto(
+        var response = new MessageResponseDto(
             msg.Id,
             msg.ConversationId,
             msg.SenderUserId,
@@ -243,6 +245,21 @@ public class ConversationService : IConversationService
             msg.IsRead,
             msg.SentAt
         );
+
+        // Send real-time notification via SignalR
+        if (_realtimeNotification != null)
+        {
+            try
+            {
+                await _realtimeNotification.NotifyNewMessageAsync(recipientUserId, response);
+            }
+            catch
+            {
+                // Continue even if SignalR fails (fallback to polling)
+            }
+        }
+
+        return response;
     }
 
     private async Task<bool> IsParticipant(User user, Conversation convo)

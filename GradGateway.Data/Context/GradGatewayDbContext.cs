@@ -9,6 +9,7 @@ public class GradGatewayDbContext : DbContext
     public GradGatewayDbContext(DbContextOptions<GradGatewayDbContext> options) : base(options) { }
 
     public DbSet<User> Users { get; set; }
+    public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
     public DbSet<StudentProfile> StudentProfiles { get; set; }
     public DbSet<CompanyProfile> CompanyProfiles { get; set; }
     public DbSet<Opportunity> Opportunities { get; set; }

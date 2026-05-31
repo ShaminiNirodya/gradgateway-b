@@ -8,4 +8,5 @@ public interface IOpportunityService
     Task<List<OpportunityResponseDto>> GetActiveOpportunitiesAsync();
     Task<List<OpportunityResponseDto>> GetCompanyOpportunitiesAsync(string firebaseUid);
     Task<OpportunityResponseDto?> GetOpportunityByIdAsync(Guid id);
+    Task<ScheduleInterviewsResultDto> ScheduleInterviewsAsync(string firebaseUid, Guid opportunityId, ScheduleInterviewsRequestDto dto);
 }

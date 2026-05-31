@@ -6,5 +6,6 @@ public record NotificationResponseDto(
     string Title,
     string Body,
     bool IsRead,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    Guid? RelatedOpportunityId
 );

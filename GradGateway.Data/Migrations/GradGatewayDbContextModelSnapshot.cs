@@ -602,6 +602,9 @@ namespace GradGateway.Data.Migrations
                     b.Property<bool>("IsRead")
                         .HasColumnType("bit");
 
+                    b.Property<Guid?>("RelatedOpportunityId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -670,6 +673,9 @@ namespace GradGateway.Data.Migrations
                     b.Property<DateTime>("DeadlineAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("DeadlineNotificationSent")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -717,6 +723,7 @@ namespace GradGateway.Data.Migrations
                             CompanyProfileId = new Guid("cccccccc-1111-2222-3333-444444444444"),
                             CreatedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DeadlineAt = new DateTime(2026, 4, 30, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DeadlineNotificationSent = false,
                             Description = "Internship for 3rd year undergraduates with C# and React exposure.",
                             IsActive = true,
                             Location = "Colombo 03",
@@ -733,6 +740,7 @@ namespace GradGateway.Data.Migrations
                             CompanyProfileId = new Guid("cccccccc-1111-2222-3333-555555555555"),
                             CreatedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DeadlineAt = new DateTime(2026, 5, 10, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DeadlineNotificationSent = false,
                             Description = "Hands-on analytics internship with telecom datasets and Power BI.",
                             IsActive = true,
                             Location = "Battaramulla",
@@ -749,6 +757,7 @@ namespace GradGateway.Data.Migrations
                             CompanyProfileId = new Guid("cccccccc-1111-2222-3333-666666666666"),
                             CreatedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DeadlineAt = new DateTime(2026, 6, 15, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DeadlineNotificationSent = false,
                             Description = "Entry-level role for fresh graduates interested in cloud-native development.",
                             IsActive = true,
                             Location = "Colombo 07",
@@ -765,6 +774,7 @@ namespace GradGateway.Data.Migrations
                             CompanyProfileId = new Guid("cccccccc-1111-2222-3333-777777777777"),
                             CreatedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DeadlineAt = new DateTime(2026, 5, 25, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DeadlineNotificationSent = false,
                             Description = "Internship focused on test automation for enterprise applications.",
                             IsActive = true,
                             Location = "Sri Lanka",
@@ -775,6 +785,42 @@ namespace GradGateway.Data.Migrations
                             UpdatedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             WorkMode = 2
                         });
+                });
+
+            modelBuilder.Entity("GradGateway.Data.Entities.PasswordResetToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsUsed")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PasswordResetTokens");
                 });
 
             modelBuilder.Entity("GradGateway.Data.Entities.Project", b =>
@@ -1429,6 +1475,17 @@ namespace GradGateway.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("CompanyProfile");
+                });
+
+            modelBuilder.Entity("GradGateway.Data.Entities.PasswordResetToken", b =>
+                {
+                    b.HasOne("GradGateway.Data.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("GradGateway.Data.Entities.Project", b =>

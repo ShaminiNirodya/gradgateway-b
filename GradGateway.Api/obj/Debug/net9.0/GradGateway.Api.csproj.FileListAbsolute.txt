@@ -482,3 +482,15 @@ D:\University App\gradgateway-b\GradGateway.Api\obj\Debug\net9.0\refint\GradGate
 D:\University App\gradgateway-b\GradGateway.Api\obj\Debug\net9.0\GradGateway.Api.pdb
 D:\University App\gradgateway-b\GradGateway.Api\obj\Debug\net9.0\GradGateway.Api.genruntimeconfig.cache
 D:\University App\gradgateway-b\GradGateway.Api\obj\Debug\net9.0\ref\GradGateway.Api.dll
+d:\University App\gradgateway-b\GradGateway.Api\bin\Debug\net9.0\FirebaseAdmin.dll
+d:\University App\gradgateway-b\GradGateway.Api\bin\Debug\net9.0\Google.Api.Gax.dll
+d:\University App\gradgateway-b\GradGateway.Api\bin\Debug\net9.0\Google.Api.Gax.Rest.dll
+d:\University App\gradgateway-b\GradGateway.Api\bin\Debug\net9.0\Google.Apis.dll
+d:\University App\gradgateway-b\GradGateway.Api\bin\Debug\net9.0\Google.Apis.Auth.dll
+d:\University App\gradgateway-b\GradGateway.Api\bin\Debug\net9.0\Google.Apis.Core.dll
+d:\University App\gradgateway-b\GradGateway.Api\bin\Debug\net9.0\Newtonsoft.Json.dll
+d:\University App\gradgateway-b\GradGateway.Api\bin\Debug\net9.0\System.Management.dll
+d:\University App\gradgateway-b\GradGateway.Api\bin\Debug\net9.0\runtimes\win\lib\net7.0\System.Management.dll
+D:\University App\gradgateway-b\GradGateway.Api\bin\Debug\net9.0\BouncyCastle.Cryptography.dll
+D:\University App\gradgateway-b\GradGateway.Api\bin\Debug\net9.0\MailKit.dll
+D:\University App\gradgateway-b\GradGateway.Api\bin\Debug\net9.0\MimeKit.dll

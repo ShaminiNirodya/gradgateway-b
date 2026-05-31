@@ -71,6 +71,28 @@ public class OpportunitiesController : ControllerBase
         }
     }
 
+    [HttpPost("{id:guid}/schedule-interviews")]
+    [Authorize]
+    public async Task<IActionResult> ScheduleInterviews(Guid id, [FromBody] ScheduleInterviewsRequestDto dto)
+    {
+        var uid = GetFirebaseUid();
+        if (string.IsNullOrWhiteSpace(uid)) return Unauthorized(new { message = "Invalid token" });
+
+        try
+        {
+            var result = await _service.ScheduleInterviewsAsync(uid, id, dto);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     private string? GetFirebaseUid()
         => User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("user_id")?.Value;
 }

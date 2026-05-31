@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text.Json.Serialization;
 using GradGateway.Business.Interfaces;
+using GradGateway.Business.Options;
 using GradGateway.Business.Services;
 using GradGateway.Data.Context;
 
@@ -94,7 +96,24 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Add SignalR
+builder.Services.AddSignalR();
+
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.Configure<FirebaseAdminOptions>(builder.Configuration.GetSection(FirebaseAdminOptions.SectionName));
+
+if (builder.Environment.IsDevelopment())
+{
+    var emailSection = builder.Configuration.GetSection(EmailOptions.SectionName);
+    var smtpUser = emailSection["SmtpUser"];
+    var smtpPassword = emailSection["SmtpPassword"];
+    Console.WriteLine(
+        $"[Email config] Enabled={emailSection["Enabled"]}, User={smtpUser}, PasswordLength={smtpPassword?.Length ?? 0}");
+}
+
 // Register Services
+builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+builder.Services.AddSingleton<IFirebaseAdminService, FirebaseAdminAuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IStudentService, StudentService>();
 builder.Services.AddScoped<ICompanyService, CompanyService>();
@@ -105,6 +124,18 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IEmailLogService, EmailLogService>();
 builder.Services.AddScoped<ICompanyTeamService, CompanyTeamService>();
+builder.Services.AddSingleton<IRealtimeNotificationService>(sp =>
+{
+    var hubContext = sp.GetRequiredService<IHubContext<GradGateway.Api.Hubs.ChatHub>>();
+    var service = new RealtimeNotificationService
+    {
+        SendMessageFunc = async (userId, data) => 
+            await hubContext.Clients.Group(userId.ToString()).SendAsync("ReceiveMessage", data),
+        SendConversationUpdateFunc = async (userId, data) => 
+            await hubContext.Clients.Group(userId.ToString()).SendAsync("ConversationUpdated", data)
+    };
+    return service;
+});
 
 var app = builder.Build();
 
@@ -138,5 +169,6 @@ app.UseAuthentication(); // Verify who they are (Firebase JWT)
 app.UseAuthorization();  // Verify what they can do (Roles)
 
 app.MapControllers();
+app.MapHub<GradGateway.Api.Hubs.ChatHub>("/hubs/chat");
 
 app.Run();
