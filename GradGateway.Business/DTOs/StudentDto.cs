@@ -12,6 +12,7 @@ public record StudentRegistrationDto(
     string GradYear,
     int CurrentYear,
     string Gpa,
+    string? Availability = "Available Now",
     IReadOnlyList<string>? Certifications = null,
     IReadOnlyList<string>? Awards = null
 );
@@ -28,6 +29,7 @@ public record StudentProfileResponseDto(
     int GradYear,
     int CurrentYear,
     decimal Gpa,
+    string Availability,
     IReadOnlyList<string> Certifications,
     IReadOnlyList<string> Awards
 );
@@ -41,5 +43,7 @@ public record StudentDirectoryItemDto(
     int CurrentYear,
     decimal Gpa,
     string Email,
-    string Skills
+    string Skills,
+    string? PhotoDataUrl,
+    string Availability
 );

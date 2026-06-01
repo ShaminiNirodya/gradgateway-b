@@ -73,6 +73,7 @@ public class StudentService : IStudentService
                 GradYear = gradYear,
                 CurrentYear = dto.CurrentYear,
                 Gpa = gpa,
+                Availability = dto.Availability ?? "Available Now",
                 CertificationsJson = SerializeStringList(dto.Certifications),
                 AwardsJson = SerializeStringList(dto.Awards),
                 CreatedAt = DateTime.UtcNow,
@@ -93,6 +94,7 @@ public class StudentService : IStudentService
             profile.GradYear = gradYear;
             profile.CurrentYear = dto.CurrentYear;
             profile.Gpa = gpa;
+            profile.Availability = dto.Availability ?? profile.Availability;
             if (dto.Certifications != null)
             {
                 profile.CertificationsJson = SerializeStringList(dto.Certifications);
@@ -125,6 +127,7 @@ public class StudentService : IStudentService
             profile.GradYear,
             profile.CurrentYear,
             profile.Gpa,
+            profile.Availability,
             DeserializeStringList(profile.CertificationsJson),
             DeserializeStringList(profile.AwardsJson)
         );
@@ -184,6 +187,7 @@ public class StudentService : IStudentService
             profile.GradYear,
             profile.CurrentYear,
             profile.Gpa,
+            profile.Availability,
             DeserializeStringList(profile.CertificationsJson),
             DeserializeStringList(profile.AwardsJson)
         );
@@ -318,17 +322,49 @@ public class StudentService : IStudentService
             .ToListAsync();
 
         var profileIds = rows.Select(r => r.Id).ToList();
-        var skills = await _context.StudentSkills
+        
+        // Get skills from both StudentSkills table and project tech stacks
+        var studentSkills = await _context.StudentSkills
             .Include(ss => ss.Skill)
             .Where(ss => profileIds.Contains(ss.StudentProfileId))
             .ToListAsync();
 
-        var skillMap = skills
-            .GroupBy(s => s.StudentProfileId)
-            .ToDictionary(
-                g => g.Key,
-                g => string.Join(", ", g.Select(x => x.Skill.Name).Distinct().OrderBy(x => x))
-            );
+        var projects = await _context.Projects
+            .Where(p => profileIds.Contains(p.StudentProfileId))
+            .Select(p => new { p.StudentProfileId, p.TechStack })
+            .ToListAsync();
+
+        var skillMap = new Dictionary<Guid, string>();
+        
+        foreach (var profileId in profileIds)
+        {
+            var skillSet = new HashSet<string>();
+            
+            // Add skills from StudentSkills table
+            var directSkills = studentSkills
+                .Where(ss => ss.StudentProfileId == profileId)
+                .Select(ss => ss.Skill.Name)
+                .Where(name => !string.IsNullOrWhiteSpace(name));
+            
+            foreach (var skill in directSkills)
+            {
+                skillSet.Add(skill);
+            }
+            
+            // Add skills from project tech stacks
+            var projectSkills = projects
+                .Where(p => p.StudentProfileId == profileId && !string.IsNullOrWhiteSpace(p.TechStack))
+                .SelectMany(p => p.TechStack.Split(','))
+                .Select(s => s.Trim())
+                .Where(s => !string.IsNullOrWhiteSpace(s));
+            
+            foreach (var skill in projectSkills)
+            {
+                skillSet.Add(skill);
+            }
+            
+            skillMap[profileId] = string.Join(", ", skillSet.OrderBy(s => s));
+        }
 
         var data = rows.Select(s =>
         {
@@ -342,7 +378,9 @@ public class StudentService : IStudentService
                 s.CurrentYear,
                 s.Gpa,
                 s.User.Email,
-                skillText
+                skillText,
+                s.PhotoDataUrl,
+                s.Availability
             );
         });
 

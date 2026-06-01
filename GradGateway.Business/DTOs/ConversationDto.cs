@@ -14,6 +14,7 @@ public record ConversationResponseDto(
     Guid Id,
     Guid? OpportunityId,
     string OtherPartyName,
+    string? OtherPartyPhotoUrl,
     string LastMessage,
     DateTime LastMessageAt
 );

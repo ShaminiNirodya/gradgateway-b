@@ -87,10 +87,13 @@ public class ConversationService : IConversationService
         }
 
         var studentName = await _context.StudentProfiles.Where(s => s.Id == convo.StudentProfileId).Select(s => s.FullName).FirstAsync();
+        var studentPhoto = await _context.StudentProfiles.Where(s => s.Id == convo.StudentProfileId).Select(s => s.PhotoDataUrl).FirstOrDefaultAsync();
         var companyName = await _context.CompanyProfiles.Where(c => c.Id == convo.CompanyProfileId).Select(c => c.CompanyName).FirstAsync();
+        var companyLogo = await _context.CompanyProfiles.Where(c => c.Id == convo.CompanyProfileId).Select(c => c.LogoDataUrl).FirstOrDefaultAsync();
         var other = user.Role == UserRole.Student ? companyName : studentName;
+        var otherPhoto = user.Role == UserRole.Student ? companyLogo : studentPhoto;
 
-        return new ConversationResponseDto(convo.Id, convo.OpportunityId, other, string.Empty, convo.LastMessageAt);
+        return new ConversationResponseDto(convo.Id, convo.OpportunityId, other, otherPhoto, string.Empty, convo.LastMessageAt);
     }
 
     public async Task<List<ConversationResponseDto>> GetMyConversationsAsync(string firebaseUid)
@@ -146,10 +149,12 @@ public class ConversationService : IConversationService
         {
             lastMessageByConversationId.TryGetValue(c.Id, out var lm);
             var other = user.Role == UserRole.Student ? c.CompanyProfile.CompanyName : c.StudentProfile.FullName;
+            var otherPhoto = user.Role == UserRole.Student ? c.CompanyProfile.LogoDataUrl : c.StudentProfile.PhotoDataUrl;
             return new ConversationResponseDto(
                 c.Id,
                 c.OpportunityId,
                 other,
+                otherPhoto,
                 lm?.Content ?? string.Empty,
                 lm?.SentAt ?? c.LastMessageAt
             );
