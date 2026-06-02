@@ -16,7 +16,8 @@ public record ConversationResponseDto(
     string OtherPartyName,
     string? OtherPartyPhotoUrl,
     string LastMessage,
-    DateTime LastMessageAt
+    DateTime LastMessageAt,
+    bool HasUnread
 );
 
 public record MessageResponseDto(

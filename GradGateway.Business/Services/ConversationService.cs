@@ -93,7 +93,7 @@ public class ConversationService : IConversationService
         var other = user.Role == UserRole.Student ? companyName : studentName;
         var otherPhoto = user.Role == UserRole.Student ? companyLogo : studentPhoto;
 
-        return new ConversationResponseDto(convo.Id, convo.OpportunityId, other, otherPhoto, string.Empty, convo.LastMessageAt);
+        return new ConversationResponseDto(convo.Id, convo.OpportunityId, other, otherPhoto, string.Empty, convo.LastMessageAt, false);
     }
 
     public async Task<List<ConversationResponseDto>> GetMyConversationsAsync(string firebaseUid)
@@ -134,20 +134,69 @@ public class ConversationService : IConversationService
 
         var lastMessageByConversationId = lastMessages.ToDictionary(x => x.ConversationId, x => x);
 
-        // Hide legacy duplicate threads by keeping only the strongest row per student-company pair.
-        rows = rows
+        var unreadConversationIds = await _context.Messages
+            .Where(m => conversationIds.Contains(m.ConversationId)
+                        && !m.IsRead
+                        && m.SenderUserId != user.Id)
+            .Select(m => m.ConversationId)
+            .Distinct()
+            .ToListAsync();
+        var unreadSet = unreadConversationIds.ToHashSet();
+
+        // Merge legacy duplicate threads per student-company pair (unread + latest message across all thread ids).
+        var aggregated = rows
             .GroupBy(c => new { c.StudentProfileId, c.CompanyProfileId })
-            .Select(group => group
-                .OrderByDescending(c => lastMessageByConversationId.ContainsKey(c.Id))
-                .ThenByDescending(c => lastMessageByConversationId.TryGetValue(c.Id, out var lm) ? lm.SentAt : DateTime.MinValue)
-                .ThenByDescending(c => c.LastMessageAt)
-                .First())
-            .OrderByDescending(c => lastMessageByConversationId.TryGetValue(c.Id, out var lm) ? lm.SentAt : c.LastMessageAt)
+            .Select(group =>
+            {
+                var threadIds = group.Select(c => c.Id).ToList();
+                var hasUnread = threadIds.Any(id => unreadSet.Contains(id));
+
+                Message? latestMessage = null;
+                foreach (var threadId in threadIds)
+                {
+                    if (!lastMessageByConversationId.TryGetValue(threadId, out var candidate))
+                    {
+                        continue;
+                    }
+
+                    if (latestMessage == null || candidate.SentAt > latestMessage.SentAt)
+                    {
+                        latestMessage = candidate;
+                    }
+                }
+
+                if (latestMessage != null
+                    && latestMessage.SenderUserId != user.Id
+                    && !latestMessage.IsRead)
+                {
+                    hasUnread = true;
+                }
+
+                var canonical = group
+                    .OrderByDescending(c => lastMessageByConversationId.ContainsKey(c.Id))
+                    .ThenByDescending(c => lastMessageByConversationId.TryGetValue(c.Id, out var lm) ? lm.SentAt : DateTime.MinValue)
+                    .ThenByDescending(c => c.LastMessageAt)
+                    .First();
+
+                var displayConversation = latestMessage != null
+                    ? group.FirstOrDefault(c => c.Id == latestMessage.ConversationId) ?? canonical
+                    : canonical;
+
+                return new
+                {
+                    Conversation = displayConversation,
+                    HasUnread = hasUnread,
+                    LatestMessage = latestMessage,
+                };
+            })
+            .OrderByDescending(x => x.HasUnread)
+            .ThenByDescending(x => x.LatestMessage?.SentAt ?? x.Conversation.LastMessageAt)
             .ToList();
 
-        return rows.Select(c =>
+        return aggregated.Select(entry =>
         {
-            lastMessageByConversationId.TryGetValue(c.Id, out var lm);
+            var c = entry.Conversation;
+            var lm = entry.LatestMessage;
             var other = user.Role == UserRole.Student ? c.CompanyProfile.CompanyName : c.StudentProfile.FullName;
             var otherPhoto = user.Role == UserRole.Student ? c.CompanyProfile.LogoDataUrl : c.StudentProfile.PhotoDataUrl;
             return new ConversationResponseDto(
@@ -156,7 +205,8 @@ public class ConversationService : IConversationService
                 other,
                 otherPhoto,
                 lm?.Content ?? string.Empty,
-                lm?.SentAt ?? c.LastMessageAt
+                lm?.SentAt ?? c.LastMessageAt,
+                entry.HasUnread
             );
         }).ToList();
     }
@@ -181,6 +231,19 @@ public class ConversationService : IConversationService
             .Where(m => m.ConversationId == conversationId)
             .OrderBy(m => m.SentAt)
             .ToListAsync();
+
+        var unreadFromOthers = messages
+            .Where(m => m.SenderUserId != user.Id && !m.IsRead)
+            .ToList();
+        if (unreadFromOthers.Count > 0)
+        {
+            foreach (var message in unreadFromOthers)
+            {
+                message.IsRead = true;
+            }
+
+            await _context.SaveChangesAsync();
+        }
 
         return messages.Select(m => new MessageResponseDto(
             m.Id,
