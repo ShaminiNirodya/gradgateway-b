@@ -12,6 +12,7 @@ public record StudentRegistrationDto(
     string GradYear,
     int CurrentYear,
     string Gpa,
+    string? FieldOfMajor = null,
     string? Availability = "Available Now",
     IReadOnlyList<string>? Certifications = null,
     IReadOnlyList<string>? Awards = null
@@ -26,6 +27,7 @@ public record StudentProfileResponseDto(
     string University,
     string StudentId,
     string Degree,
+    string FieldOfMajor,
     int GradYear,
     int CurrentYear,
     decimal Gpa,
@@ -39,6 +41,7 @@ public record StudentDirectoryItemDto(
     string FullName,
     string University,
     string Degree,
+    string FieldOfMajor,
     int GradYear,
     int CurrentYear,
     decimal Gpa,

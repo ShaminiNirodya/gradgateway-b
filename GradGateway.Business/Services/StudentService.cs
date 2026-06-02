@@ -70,6 +70,7 @@ public class StudentService : IStudentService
                 University = dto.University,
                 StudentId = ResolveStudentId(dto.StudentId, user.Id),
                 Degree = dto.Degree,
+                FieldOfMajor = dto.FieldOfMajor ?? string.Empty,
                 GradYear = gradYear,
                 CurrentYear = dto.CurrentYear,
                 Gpa = gpa,
@@ -91,6 +92,10 @@ public class StudentService : IStudentService
                 ? profile.StudentId
                 : dto.StudentId.Trim();
             profile.Degree = dto.Degree;
+            if (dto.FieldOfMajor != null)
+            {
+                profile.FieldOfMajor = dto.FieldOfMajor;
+            }
             profile.GradYear = gradYear;
             profile.CurrentYear = dto.CurrentYear;
             profile.Gpa = gpa;
@@ -124,6 +129,7 @@ public class StudentService : IStudentService
             profile.University,
             profile.StudentId,
             profile.Degree,
+            profile.FieldOfMajor,
             profile.GradYear,
             profile.CurrentYear,
             profile.Gpa,
@@ -184,6 +190,7 @@ public class StudentService : IStudentService
             profile.University,
             profile.StudentId,
             profile.Degree,
+            profile.FieldOfMajor,
             profile.GradYear,
             profile.CurrentYear,
             profile.Gpa,
@@ -374,6 +381,7 @@ public class StudentService : IStudentService
                 s.FullName,
                 s.University,
                 s.Degree,
+                s.FieldOfMajor,
                 s.GradYear,
                 s.CurrentYear,
                 s.Gpa,
@@ -394,6 +402,7 @@ public class StudentService : IStudentService
                 d.FullName.ToLower().Contains(term) ||
                 d.University.ToLower().Contains(term) ||
                 d.Degree.ToLower().Contains(term) ||
+                d.FieldOfMajor.ToLower().Contains(term) ||
                 d.Skills.ToLower().Contains(term)
             )
             .ToList();

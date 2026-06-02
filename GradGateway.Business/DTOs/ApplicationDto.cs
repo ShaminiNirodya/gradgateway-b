@@ -9,9 +9,17 @@ public record UpdateApplicationStatusRequestDto(
     string Status
 );
 
+public record CreateJobOfferRequestDto(
+    Guid StudentProfileId,
+    string JobTitle,
+    string JobType,
+    string? Compensation,
+    string ProposalMessage
+);
+
 public record ApplicationResponseDto(
     Guid Id,
-    Guid OpportunityId,
+    Guid? OpportunityId,
     Guid StudentProfileId,
     string JobTitle,
     string CompanyName,

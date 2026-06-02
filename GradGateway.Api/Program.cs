@@ -124,6 +124,7 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IEmailLogService, EmailLogService>();
 builder.Services.AddScoped<ICompanyTeamService, CompanyTeamService>();
+builder.Services.AddScoped<IPlatformStatsService, PlatformStatsService>();
 builder.Services.AddSingleton<IRealtimeNotificationService>(sp =>
 {
     var hubContext = sp.GetRequiredService<IHubContext<GradGateway.Api.Hubs.ChatHub>>();

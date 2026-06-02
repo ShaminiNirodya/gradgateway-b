@@ -8,4 +8,5 @@ public interface IApplicationService
     Task<List<ApplicationResponseDto>> GetStudentApplicationsAsync(string firebaseUid);
     Task<List<ApplicationResponseDto>> GetCompanyApplicationsAsync(string firebaseUid);
     Task<ApplicationResponseDto> UpdateStatusAsync(string firebaseUid, Guid applicationId, string status);
+    Task<ApplicationResponseDto> CreateJobOfferApplicationAsync(string firebaseUid, Guid studentProfileId, string jobTitle, string jobType, string? compensation, string proposalMessage);
 }

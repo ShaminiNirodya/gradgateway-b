@@ -55,7 +55,7 @@ public class OpportunityService : IOpportunityService
         _context.Opportunities.Add(opportunity);
         await _context.SaveChangesAsync();
 
-        return ToResponse(opportunity, company.CompanyName);
+        return ToResponse(opportunity, company.CompanyName, company.LogoDataUrl);
     }
 
     public async Task<List<OpportunityResponseDto>> GetActiveOpportunitiesAsync()
@@ -71,7 +71,7 @@ public class OpportunityService : IOpportunityService
             .OrderByDescending(o => o.CreatedAt)
             .ToListAsync();
 
-        return rows.Select(o => ToResponse(o, o.CompanyProfile.CompanyName)).ToList();
+        return rows.Select(o => ToResponse(o, o.CompanyProfile.CompanyName, o.CompanyProfile.LogoDataUrl)).ToList();
     }
 
     public async Task<List<OpportunityResponseDto>> GetCompanyOpportunitiesAsync(string firebaseUid)
@@ -92,7 +92,7 @@ public class OpportunityService : IOpportunityService
             .OrderByDescending(o => o.CreatedAt)
             .ToListAsync();
 
-        return rows.Select(o => ToResponse(o, company.CompanyName)).ToList();
+        return rows.Select(o => ToResponse(o, company.CompanyName, company.LogoDataUrl)).ToList();
     }
 
     public async Task<OpportunityResponseDto?> GetOpportunityByIdAsync(Guid id)
@@ -101,15 +101,16 @@ public class OpportunityService : IOpportunityService
             .Include(o => o.CompanyProfile)
             .FirstOrDefaultAsync(o => o.Id == id);
 
-        return row == null ? null : ToResponse(row, row.CompanyProfile.CompanyName);
+        return row == null ? null : ToResponse(row, row.CompanyProfile.CompanyName, row.CompanyProfile.LogoDataUrl);
     }
 
-    private static OpportunityResponseDto ToResponse(Opportunity o, string companyName)
+    private static OpportunityResponseDto ToResponse(Opportunity o, string companyName, string? companyLogoUrl = null)
     {
         return new OpportunityResponseDto(
             o.Id,
             o.CompanyProfileId,
             companyName,
+            companyLogoUrl,
             o.Title,
             o.Description,
             o.OpportunityType.ToString(),

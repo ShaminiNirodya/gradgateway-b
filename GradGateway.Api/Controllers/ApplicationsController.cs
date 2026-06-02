@@ -94,6 +94,34 @@ public class ApplicationsController : ControllerBase
         }
     }
 
+    [HttpPost("job-offer")]
+    public async Task<IActionResult> CreateJobOffer([FromBody] CreateJobOfferRequestDto dto)
+    {
+        var uid = GetFirebaseUid();
+        if (string.IsNullOrWhiteSpace(uid)) return Unauthorized(new { message = "Invalid token" });
+
+        try
+        {
+            var result = await _service.CreateJobOfferApplicationAsync(
+                uid,
+                dto.StudentProfileId,
+                dto.JobTitle,
+                dto.JobType,
+                dto.Compensation,
+                dto.ProposalMessage
+            );
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     private string? GetFirebaseUid()
         => User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("user_id")?.Value;
 }

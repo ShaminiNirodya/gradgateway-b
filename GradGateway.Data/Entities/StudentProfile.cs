@@ -13,6 +13,7 @@ public class StudentProfile
     public string University { get; set; } = string.Empty;
     public string StudentId { get; set; } = string.Empty;
     public string Degree { get; set; } = string.Empty;
+    public string FieldOfMajor { get; set; } = string.Empty;
     public int GradYear { get; set; }
     public int CurrentYear { get; set; } // 1=1st Year, 2=2nd Year, 3=3rd Year, 4=4th Year, etc.
     public decimal Gpa { get; set; }

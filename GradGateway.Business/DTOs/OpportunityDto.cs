@@ -15,6 +15,7 @@ public record OpportunityResponseDto(
     Guid Id,
     Guid CompanyProfileId,
     string CompanyName,
+    string? CompanyLogoUrl,
     string Title,
     string Description,
     string OpportunityType,

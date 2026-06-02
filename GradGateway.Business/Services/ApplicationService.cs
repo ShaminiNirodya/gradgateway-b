@@ -95,24 +95,42 @@ public class ApplicationService : IApplicationService
 
         var rows = await _context.Applications
             .Include(a => a.Opportunity)
-                .ThenInclude(o => o.CompanyProfile)
+                .ThenInclude(o => o!.CompanyProfile)
+            .Include(a => a.CompanyProfile)
             .Where(a => a.StudentProfileId == student.Id)
             .OrderByDescending(a => a.AppliedAt)
             .ToListAsync();
 
-        return rows.Select(a => new ApplicationResponseDto(
-            a.Id,
-            a.OpportunityId,
-            student.Id,
-            a.Opportunity.Title,
-            a.Opportunity.CompanyProfile.CompanyName,
-            student.FullName,
-            user.Email,
-            a.CoverLetter,
-            a.Status.ToString(),
-            a.AppliedAt,
-            a.UpdatedAt
-        )).ToList();
+        return rows.Select(a =>
+        {
+            string jobTitle;
+            string companyName;
+            
+            if (a.Opportunity != null)
+            {
+                jobTitle = a.Opportunity.Title;
+                companyName = a.Opportunity.CompanyProfile.CompanyName;
+            }
+            else
+            {
+                jobTitle = a.JobTitle ?? "Direct Job Offer";
+                companyName = a.CompanyProfile?.CompanyName ?? "Unknown Company";
+            }
+
+            return new ApplicationResponseDto(
+                a.Id,
+                a.OpportunityId,
+                student.Id,
+                jobTitle,
+                companyName,
+                student.FullName,
+                user.Email,
+                a.CoverLetter,
+                a.Status.ToString(),
+                a.AppliedAt,
+                a.UpdatedAt
+            );
+        }).ToList();
     }
 
     public async Task<List<ApplicationResponseDto>> GetCompanyApplicationsAsync(string firebaseUid)
@@ -129,23 +147,29 @@ public class ApplicationService : IApplicationService
             .Include(a => a.Opportunity)
             .Include(a => a.StudentProfile)
                 .ThenInclude(s => s.User)
-            .Where(a => a.Opportunity.CompanyProfileId == company.Id)
+            .Where(a => (a.Opportunity != null && a.Opportunity.CompanyProfileId == company.Id) ||
+                       (a.CompanyProfileId == company.Id))
             .OrderByDescending(a => a.AppliedAt)
             .ToListAsync();
 
-        return rows.Select(a => new ApplicationResponseDto(
-            a.Id,
-            a.OpportunityId,
-            a.StudentProfileId,
-            a.Opportunity.Title,
-            company.CompanyName,
-            a.StudentProfile.FullName,
-            a.StudentProfile.User.Email,
-            a.CoverLetter,
-            a.Status.ToString(),
-            a.AppliedAt,
-            a.UpdatedAt
-        )).ToList();
+        return rows.Select(a =>
+        {
+            string jobTitle = a.Opportunity != null ? a.Opportunity.Title : (a.JobTitle ?? "Direct Job Offer");
+            
+            return new ApplicationResponseDto(
+                a.Id,
+                a.OpportunityId,
+                a.StudentProfileId,
+                jobTitle,
+                company.CompanyName,
+                a.StudentProfile.FullName,
+                a.StudentProfile.User.Email,
+                a.CoverLetter,
+                a.Status.ToString(),
+                a.AppliedAt,
+                a.UpdatedAt
+            );
+        }).ToList();
     }
 
     public async Task<ApplicationResponseDto> UpdateStatusAsync(string firebaseUid, Guid applicationId, string status)
@@ -160,7 +184,8 @@ public class ApplicationService : IApplicationService
 
         var app = await _context.Applications
             .Include(a => a.Opportunity)
-                .ThenInclude(o => o.CompanyProfile)
+                .ThenInclude(o => o!.CompanyProfile)
+            .Include(a => a.CompanyProfile)
             .Include(a => a.StudentProfile)
                 .ThenInclude(s => s.User)
             .FirstOrDefaultAsync(a => a.Id == applicationId);
@@ -168,7 +193,8 @@ public class ApplicationService : IApplicationService
         if (app == null)
             throw new ArgumentException("Application not found.");
 
-        if (app.Opportunity.CompanyProfileId != company.Id)
+        var companyId = app.Opportunity?.CompanyProfileId ?? app.CompanyProfileId;
+        if (companyId != company.Id)
             throw new InvalidOperationException("You are not allowed to update this application.");
 
         if (!Enum.TryParse<ApplicationStatus>(status, true, out var parsed))
@@ -177,13 +203,16 @@ public class ApplicationService : IApplicationService
         app.Status = parsed;
         app.UpdatedAt = DateTime.UtcNow;
 
+        string jobTitle = app.Opportunity?.Title ?? app.JobTitle ?? "Direct Job Offer";
+        string companyName = app.Opportunity?.CompanyProfile?.CompanyName ?? app.CompanyProfile?.CompanyName ?? company.CompanyName;
+
         _context.Notifications.Add(new Notification
         {
             Id = Guid.NewGuid(),
             UserId = app.StudentProfile.UserId,
             Type = NotificationType.Application,
             Title = "Application Status Updated",
-            Body = $"Your application for {app.Opportunity.Title} is now {parsed}.",
+            Body = $"Your application for {jobTitle} is now {parsed}.",
             IsRead = false,
             CreatedAt = DateTime.UtcNow
         });
@@ -194,10 +223,78 @@ public class ApplicationService : IApplicationService
             app.Id,
             app.OpportunityId,
             app.StudentProfileId,
-            app.Opportunity.Title,
-            app.Opportunity.CompanyProfile.CompanyName,
+            jobTitle,
+            companyName,
             app.StudentProfile.FullName,
             app.StudentProfile.User.Email,
+            app.CoverLetter,
+            app.Status.ToString(),
+            app.AppliedAt,
+            app.UpdatedAt
+        );
+    }
+
+    public async Task<ApplicationResponseDto> CreateJobOfferApplicationAsync(
+        string firebaseUid,
+        Guid studentProfileId,
+        string jobTitle,
+        string jobType,
+        string? compensation,
+        string proposalMessage)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid);
+        if (user == null || user.Role != UserRole.Company)
+            throw new InvalidOperationException("Only company users can send job offers.");
+
+        var company = await _context.CompanyProfiles.FirstOrDefaultAsync(c => c.UserId == user.Id);
+        if (company == null)
+            throw new InvalidOperationException("Company profile not found.");
+
+        var student = await _context.StudentProfiles
+            .Include(s => s.User)
+            .FirstOrDefaultAsync(s => s.Id == studentProfileId);
+        if (student == null)
+            throw new ArgumentException("Student not found.");
+
+        var app = new Application
+        {
+            Id = Guid.NewGuid(),
+            OpportunityId = null,
+            CompanyProfileId = company.Id,
+            StudentProfileId = student.Id,
+            CoverLetter = proposalMessage,
+            JobTitle = jobTitle,
+            JobType = jobType,
+            Compensation = compensation,
+            Status = ApplicationStatus.OfferSent,
+            AppliedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.Applications.Add(app);
+
+        var notif = new Notification
+        {
+            Id = Guid.NewGuid(),
+            UserId = student.UserId,
+            Type = NotificationType.Application,
+            Title = "Job Offer Received",
+            Body = $"{company.CompanyName} sent you a job offer for {jobTitle}.",
+            IsRead = false,
+            CreatedAt = DateTime.UtcNow
+        };
+        _context.Notifications.Add(notif);
+
+        await _context.SaveChangesAsync();
+
+        return new ApplicationResponseDto(
+            app.Id,
+            null,
+            student.Id,
+            jobTitle,
+            company.CompanyName,
+            student.FullName,
+            student.User.Email,
             app.CoverLetter,
             app.Status.ToString(),
             app.AppliedAt,
