@@ -80,4 +80,34 @@ public class CompaniesController : ControllerBase
             return StatusCode(500, new { message = "An error occurred while retrieving company profile" });
         }
     }
+
+    /// <summary>
+    /// Public company profile for students (recruiter + contact + active openings).
+    /// </summary>
+    [HttpGet("public/{id:guid}")]
+    [Authorize]
+    public Task<IActionResult> GetPublicCompanyProfile(Guid id) => GetPublicCompanyProfileCore(id);
+
+    [HttpGet("{id:guid}/public")]
+    [Authorize]
+    public Task<IActionResult> GetPublicCompanyProfileLegacy(Guid id) => GetPublicCompanyProfileCore(id);
+
+    private async Task<IActionResult> GetPublicCompanyProfileCore(Guid id)
+    {
+        try
+        {
+            var profile = await _companyService.GetPublicCompanyProfileAsync(id);
+            if (profile == null)
+            {
+                return NotFound(new { message = "Company profile not found" });
+            }
+
+            return Ok(profile);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting public company profile {CompanyId}", id);
+            return StatusCode(500, new { message = "An error occurred while retrieving company profile" });
+        }
+    }
 }

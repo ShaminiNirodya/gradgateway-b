@@ -11,17 +11,31 @@ namespace GradGateway.Api.Controllers;
 public class OpportunitiesController : ControllerBase
 {
     private readonly IOpportunityService _service;
+    private readonly IInterviewPlanService _interviewPlanService;
+    private readonly ICompanyService _companyService;
 
-    public OpportunitiesController(IOpportunityService service)
+    public OpportunitiesController(
+        IOpportunityService service,
+        IInterviewPlanService interviewPlanService,
+        ICompanyService companyService)
     {
         _service = service;
+        _interviewPlanService = interviewPlanService;
+        _companyService = companyService;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
-        var data = await _service.GetActiveOpportunitiesAsync();
-        return Ok(data);
+        var feed = await _service.GetStudentOpeningsFeedAsync();
+        return Ok(feed);
+    }
+
+    [HttpGet("expired-count")]
+    public async Task<IActionResult> GetExpiredCount()
+    {
+        var count = await _service.GetExpiredOpportunitiesCountAsync();
+        return Ok(new { count });
     }
 
     [HttpGet("{id:guid}")]
@@ -29,6 +43,34 @@ public class OpportunitiesController : ControllerBase
     {
         var item = await _service.GetOpportunityByIdAsync(id);
         return item == null ? NotFound(new { message = "Opportunity not found" }) : Ok(item);
+    }
+
+    /// <summary>
+    /// Public company profile for the employer behind a job listing (student view).
+    /// </summary>
+    [HttpGet("{id:guid}/company-profile")]
+    [Authorize]
+    public async Task<IActionResult> GetCompanyProfileForOpportunity(Guid id)
+    {
+        var uid = GetFirebaseUid();
+        if (string.IsNullOrWhiteSpace(uid))
+        {
+            return Unauthorized(new { message = "Invalid token: Firebase UID not found" });
+        }
+
+        var opportunity = await _service.GetOpportunityByIdAsync(id);
+        if (opportunity == null)
+        {
+            return NotFound(new { message = "Opportunity not found" });
+        }
+
+        var profile = await _companyService.GetPublicCompanyProfileAsync(opportunity.CompanyProfileId);
+        if (profile == null)
+        {
+            return NotFound(new { message = "Company profile not found" });
+        }
+
+        return Ok(profile);
     }
 
     [HttpGet("company/me")]
@@ -64,6 +106,24 @@ public class OpportunitiesController : ControllerBase
         catch (ArgumentException ex)
         {
             return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("{id:guid}/interview-plan")]
+    [Authorize]
+    public async Task<IActionResult> GetInterviewPlan(Guid id)
+    {
+        var uid = GetFirebaseUid();
+        if (string.IsNullOrWhiteSpace(uid)) return Unauthorized(new { message = "Invalid token" });
+
+        try
+        {
+            var plan = await _interviewPlanService.GetPlanAsync(uid, id);
+            return plan == null ? Ok(null) : Ok(plan);
         }
         catch (InvalidOperationException ex)
         {

@@ -11,11 +11,16 @@ namespace GradGateway.Api.Controllers;
 public class StudentsController : ControllerBase
 {
     private readonly IStudentService _studentService;
+    private readonly IProjectService _projectService;
     private readonly ILogger<StudentsController> _logger;
 
-    public StudentsController(IStudentService studentService, ILogger<StudentsController> logger)
+    public StudentsController(
+        IStudentService studentService,
+        IProjectService projectService,
+        ILogger<StudentsController> logger)
     {
         _studentService = studentService;
+        _projectService = projectService;
         _logger = logger;
     }
 
@@ -82,6 +87,34 @@ public class StudentsController : ControllerBase
         {
             _logger.LogError(ex, "Error getting student profile");
             return StatusCode(500, new { message = "An error occurred while retrieving student profile" });
+        }
+    }
+
+    [HttpGet("{studentProfileId:guid}/projects")]
+    [Authorize]
+    public async Task<IActionResult> GetStudentProjects(Guid studentProfileId)
+    {
+        try
+        {
+            var firebaseUid = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                           ?? User.FindFirst("user_id")?.Value;
+
+            if (string.IsNullOrWhiteSpace(firebaseUid))
+            {
+                return Unauthorized(new { message = "Invalid token: Firebase UID not found" });
+            }
+
+            var result = await _projectService.GetProjectsByStudentProfileIdAsync(firebaseUid, studentProfileId);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error loading projects for student {StudentProfileId}", studentProfileId);
+            return StatusCode(500, new { message = "An error occurred while retrieving student projects" });
         }
     }
 

@@ -18,20 +18,47 @@ public class ProjectService : IProjectService
     public async Task<List<ProjectResponseDto>> GetMyProjectsAsync(string firebaseUid)
     {
         var student = await GetStudentProfileAsync(firebaseUid);
+        return await QueryProjectsForStudentAsync(student, excludeSeededDemo: true);
+    }
 
+    public async Task<List<ProjectResponseDto>> GetProjectsByStudentProfileIdAsync(string firebaseUid, Guid studentProfileId)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid)
+            ?? throw new InvalidOperationException("User not found.");
+
+        if (user.Role is not (UserRole.Company or UserRole.Admin))
+            throw new InvalidOperationException("Only company users can view student portfolio projects.");
+
+        var student = await _context.StudentProfiles.FirstOrDefaultAsync(s => s.Id == studentProfileId)
+            ?? throw new InvalidOperationException("Student profile not found.");
+
+        // Companies see the full portfolio (including seeded samples); students' own list hides demo seeds.
+        return await QueryProjectsForStudentAsync(student, excludeSeededDemo: false);
+    }
+
+    private async Task<List<ProjectResponseDto>> QueryProjectsForStudentAsync(
+        StudentProfile student,
+        bool excludeSeededDemo)
+    {
         var demoRepoUrls = new[]
         {
             "https://github.com/gradgateway/demo-portfolio",
             "https://github.com/gradgateway/lanka-transit-insights"
         };
 
-        var rows = await _context.Projects
+        var query = _context.Projects
             .Include(p => p.Images)
-            .Where(p => p.StudentProfileId == student.Id)
-            .Where(p =>
+            .Where(p => p.StudentProfileId == student.Id);
+
+        if (excludeSeededDemo)
+        {
+            query = query.Where(p =>
                 !demoRepoUrls.Contains(p.RepositoryUrl ?? string.Empty) &&
                 p.Title != "Lanka Transit Insights" &&
-                p.Title != $"{student.FullName} - Internship Portfolio")
+                p.Title != $"{student.FullName} - Internship Portfolio");
+        }
+
+        var rows = await query
             .OrderByDescending(p => p.UpdatedAt)
             .ToListAsync();
 

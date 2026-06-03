@@ -11,6 +11,11 @@ public record CreateOpportunityRequestDto(
     DateTime DeadlineAt
 );
 
+public record StudentOpeningsFeedDto(
+    List<OpportunityResponseDto> Active,
+    int ExpiredCount
+);
+
 public record OpportunityResponseDto(
     Guid Id,
     Guid CompanyProfileId,

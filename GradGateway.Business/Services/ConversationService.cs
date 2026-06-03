@@ -1,3 +1,4 @@
+using GradGateway.Business;
 using GradGateway.Business.DTOs;
 using GradGateway.Business.Interfaces;
 using GradGateway.Data.Context;
@@ -9,11 +10,16 @@ namespace GradGateway.Business.Services;
 public class ConversationService : IConversationService
 {
     private readonly GradGatewayDbContext _context;
+    private readonly IApplicationService _applicationService;
     private readonly IRealtimeNotificationService? _realtimeNotification;
 
-    public ConversationService(GradGatewayDbContext context, IRealtimeNotificationService? realtimeNotification = null)
+    public ConversationService(
+        GradGatewayDbContext context,
+        IApplicationService applicationService,
+        IRealtimeNotificationService? realtimeNotification = null)
     {
         _context = context;
+        _applicationService = applicationService;
         _realtimeNotification = realtimeNotification;
     }
 
@@ -100,6 +106,8 @@ public class ConversationService : IConversationService
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid)
                    ?? throw new InvalidOperationException("User not found.");
+
+        await CollapseStaleMessageNotificationsAsync(user.Id);
 
         IQueryable<Conversation> query = _context.Conversations
             .Include(c => c.StudentProfile)
@@ -226,15 +234,19 @@ public class ConversationService : IConversationService
         if (!isParticipant)
             throw new InvalidOperationException("You are not allowed to view this conversation.");
 
-        var messages = await _context.Messages
-            .Include(m => m.SenderUser)
-            .Where(m => m.ConversationId == conversationId)
-            .OrderBy(m => m.SentAt)
+        // Mark read across every thread for this student–company pair (legacy duplicates may exist).
+        var threadIds = await _context.Conversations
+            .Where(c => c.StudentProfileId == convo.StudentProfileId
+                        && c.CompanyProfileId == convo.CompanyProfileId)
+            .Select(c => c.Id)
             .ToListAsync();
 
-        var unreadFromOthers = messages
-            .Where(m => m.SenderUserId != user.Id && !m.IsRead)
-            .ToList();
+        var unreadFromOthers = await _context.Messages
+            .Where(m => threadIds.Contains(m.ConversationId)
+                        && m.SenderUserId != user.Id
+                        && !m.IsRead)
+            .ToListAsync();
+
         if (unreadFromOthers.Count > 0)
         {
             foreach (var message in unreadFromOthers)
@@ -242,8 +254,28 @@ public class ConversationService : IConversationService
                 message.IsRead = true;
             }
 
+            var unreadMessageAlerts = await _context.Notifications
+                .Where(n => n.UserId == user.Id
+                            && !n.IsRead
+                            && n.Type == NotificationType.Message
+                            && (convo.OpportunityId == null
+                                ? n.RelatedOpportunityId == null
+                                : n.RelatedOpportunityId == convo.OpportunityId))
+                .ToListAsync();
+
+            foreach (var notification in unreadMessageAlerts)
+            {
+                notification.IsRead = true;
+            }
+
             await _context.SaveChangesAsync();
         }
+
+        var messages = await _context.Messages
+            .Include(m => m.SenderUser)
+            .Where(m => m.ConversationId == conversationId)
+            .OrderBy(m => m.SentAt)
+            .ToListAsync();
 
         return messages.Select(m => new MessageResponseDto(
             m.Id,
@@ -287,20 +319,47 @@ public class ConversationService : IConversationService
         _context.Messages.Add(msg);
         convo.LastMessageAt = msg.SentAt;
 
+        Notification? offerResponseNotification = null;
+        if (user.Role == UserRole.Student
+            && JobOfferResponseMatcher.TryParse(msg.Content, out var offerAccepted))
+        {
+            offerResponseNotification = await _applicationService.TryApplyJobOfferResponseInConversationAsync(
+                firebaseUid,
+                conversationId,
+                offerAccepted);
+        }
+
         var recipientUserId = user.Role == UserRole.Student
             ? convo.CompanyProfile.UserId
             : convo.StudentProfile.UserId;
 
-        _context.Notifications.Add(new Notification
+        // One unread message alert per conversation thread (not per message).
+        var staleMessageAlerts = await _context.Notifications
+            .Where(n => n.UserId == recipientUserId
+                        && !n.IsRead
+                        && n.Type == NotificationType.Message
+                        && (convo.OpportunityId == null
+                            ? n.RelatedOpportunityId == null
+                            : n.RelatedOpportunityId == convo.OpportunityId))
+            .ToListAsync();
+
+        foreach (var stale in staleMessageAlerts)
+        {
+            stale.IsRead = true;
+        }
+
+        var messageNotification = new Notification
         {
             Id = Guid.NewGuid(),
             UserId = recipientUserId,
             Type = NotificationType.Message,
             Title = "New message",
             Body = "You received a new message.",
+            RelatedOpportunityId = convo.OpportunityId,
             IsRead = false,
             CreatedAt = DateTime.UtcNow
-        });
+        };
+        _context.Notifications.Add(messageNotification);
 
         await _context.SaveChangesAsync();
 
@@ -320,6 +379,41 @@ public class ConversationService : IConversationService
             try
             {
                 await _realtimeNotification.NotifyNewMessageAsync(recipientUserId, response);
+
+                var recipient = await _context.Users.AsNoTracking()
+                    .FirstOrDefaultAsync(u => u.Id == recipientUserId);
+                if (recipient != null && !string.IsNullOrWhiteSpace(recipient.FirebaseUid))
+                {
+                    var notificationDto = new NotificationResponseDto(
+                        messageNotification.Id,
+                        messageNotification.Type.ToString(),
+                        messageNotification.Title,
+                        messageNotification.Body,
+                        messageNotification.IsRead,
+                        messageNotification.CreatedAt,
+                        messageNotification.RelatedOpportunityId
+                    );
+                    await _realtimeNotification.NotifyNotificationAsync(recipient.FirebaseUid, notificationDto);
+                }
+
+                if (offerResponseNotification != null)
+                {
+                    var companyUser = await _context.Users.AsNoTracking()
+                        .FirstOrDefaultAsync(u => u.Id == offerResponseNotification.UserId);
+                    if (companyUser != null && !string.IsNullOrWhiteSpace(companyUser.FirebaseUid))
+                    {
+                        var offerNotifDto = new NotificationResponseDto(
+                            offerResponseNotification.Id,
+                            offerResponseNotification.Type.ToString(),
+                            offerResponseNotification.Title,
+                            offerResponseNotification.Body,
+                            offerResponseNotification.IsRead,
+                            offerResponseNotification.CreatedAt,
+                            offerResponseNotification.RelatedOpportunityId
+                        );
+                        await _realtimeNotification.NotifyNotificationAsync(companyUser.FirebaseUid, offerNotifDto);
+                    }
+                }
             }
             catch
             {
@@ -328,6 +422,43 @@ public class ConversationService : IConversationService
         }
 
         return response;
+    }
+
+    /// <summary>
+    /// Keeps at most one unread "New message" notification per opportunity thread.
+    /// </summary>
+    private async Task CollapseStaleMessageNotificationsAsync(Guid userId)
+    {
+        var unreadMessageAlerts = await _context.Notifications
+            .Where(n => n.UserId == userId
+                        && !n.IsRead
+                        && n.Type == NotificationType.Message
+                        && n.Title == "New message")
+            .OrderByDescending(n => n.CreatedAt)
+            .ToListAsync();
+
+        var groups = unreadMessageAlerts.GroupBy(n => n.RelatedOpportunityId);
+        var changed = false;
+
+        foreach (var group in groups)
+        {
+            var duplicates = group.Skip(1).ToList();
+            if (duplicates.Count == 0)
+            {
+                continue;
+            }
+
+            foreach (var duplicate in duplicates)
+            {
+                duplicate.IsRead = true;
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
+            await _context.SaveChangesAsync();
+        }
     }
 
     private async Task<bool> IsParticipant(User user, Conversation convo)

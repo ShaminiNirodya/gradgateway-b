@@ -31,10 +31,25 @@ namespace GradGateway.Data.Migrations
                     b.Property<DateTime>("AppliedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<Guid?>("CompanyProfileId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Compensation")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("CoverLetter")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<Guid>("OpportunityId")
+                    b.Property<DateTime?>("InterviewPlanNotifiedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("JobTitle")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("JobType")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("OpportunityId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<int>("Status")
@@ -48,12 +63,15 @@ namespace GradGateway.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CompanyProfileId");
+
                     b.HasIndex("OpportunityId");
 
                     b.HasIndex("StudentProfileId");
 
                     b.HasIndex("OpportunityId", "StudentProfileId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[OpportunityId] IS NOT NULL");
 
                     b.ToTable("Applications");
 
@@ -787,6 +805,48 @@ namespace GradGateway.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("GradGateway.Data.Entities.OpportunityInterviewPlan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DurationMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Location")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("MeetingLink")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Mode")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("OpportunityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TentativeDatesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OpportunityId")
+                        .IsUnique();
+
+                    b.ToTable("OpportunityInterviewPlans");
+                });
+
             modelBuilder.Entity("GradGateway.Data.Entities.PasswordResetToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1040,6 +1100,10 @@ namespace GradGateway.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("Availability")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("AwardsJson")
                         .HasColumnType("nvarchar(max)");
 
@@ -1049,14 +1113,16 @@ namespace GradGateway.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<int>("CurrentYear")
+                        .HasColumnType("int");
+
                     b.Property<string>("Degree")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("FieldOfMajor")
                         .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("nvarchar(120)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("FullName")
                         .IsRequired()
@@ -1067,9 +1133,6 @@ namespace GradGateway.Data.Migrations
                         .HasColumnType("decimal(3,2)");
 
                     b.Property<int>("GradYear")
-                        .HasColumnType("int");
-
-                    b.Property<int>("CurrentYear")
                         .HasColumnType("int");
 
                     b.Property<string>("Phone")
@@ -1107,9 +1170,11 @@ namespace GradGateway.Data.Migrations
                         new
                         {
                             Id = new Guid("bbbbbbbb-1111-2222-3333-444444444444"),
+                            Availability = "Available Now",
                             CreatedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            CurrentYear = 3,
+                            CurrentYear = 0,
                             Degree = "BSc (Hons) in IT",
+                            FieldOfMajor = "",
                             FullName = "Demo Student",
                             Gpa = 3.45m,
                             GradYear = 2027,
@@ -1122,9 +1187,11 @@ namespace GradGateway.Data.Migrations
                         new
                         {
                             Id = new Guid("bbbbbbbb-1111-2222-3333-555555555555"),
+                            Availability = "Available Now",
                             CreatedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            CurrentYear = 4,
+                            CurrentYear = 0,
                             Degree = "BSc Engineering",
+                            FieldOfMajor = "",
                             FullName = "Nethmi Perera",
                             Gpa = 3.82m,
                             GradYear = 2026,
@@ -1137,9 +1204,11 @@ namespace GradGateway.Data.Migrations
                         new
                         {
                             Id = new Guid("bbbbbbbb-1111-2222-3333-666666666666"),
+                            Availability = "Available Now",
                             CreatedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            CurrentYear = 4,
+                            CurrentYear = 0,
                             Degree = "BSc (Hons) in Computer Science",
+                            FieldOfMajor = "",
                             FullName = "Sahan Jayasinghe",
                             Gpa = 3.67m,
                             GradYear = 2025,
@@ -1152,9 +1221,11 @@ namespace GradGateway.Data.Migrations
                         new
                         {
                             Id = new Guid("bbbbbbbb-1111-2222-3333-777777777777"),
+                            Availability = "Available Now",
                             CreatedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            CurrentYear = 3,
+                            CurrentYear = 0,
                             Degree = "BSc in Information Technology",
+                            FieldOfMajor = "",
                             FullName = "Tharushi Senanayake",
                             Gpa = 3.29m,
                             GradYear = 2027,
@@ -1342,17 +1413,22 @@ namespace GradGateway.Data.Migrations
 
             modelBuilder.Entity("GradGateway.Data.Entities.Application", b =>
                 {
+                    b.HasOne("GradGateway.Data.Entities.CompanyProfile", "CompanyProfile")
+                        .WithMany()
+                        .HasForeignKey("CompanyProfileId");
+
                     b.HasOne("GradGateway.Data.Entities.Opportunity", "Opportunity")
                         .WithMany()
                         .HasForeignKey("OpportunityId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("GradGateway.Data.Entities.StudentProfile", "StudentProfile")
                         .WithMany()
                         .HasForeignKey("StudentProfileId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("CompanyProfile");
 
                     b.Navigation("Opportunity");
 
@@ -1487,6 +1563,17 @@ namespace GradGateway.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("CompanyProfile");
+                });
+
+            modelBuilder.Entity("GradGateway.Data.Entities.OpportunityInterviewPlan", b =>
+                {
+                    b.HasOne("GradGateway.Data.Entities.Opportunity", "Opportunity")
+                        .WithMany()
+                        .HasForeignKey("OpportunityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Opportunity");
                 });
 
             modelBuilder.Entity("GradGateway.Data.Entities.PasswordResetToken", b =>

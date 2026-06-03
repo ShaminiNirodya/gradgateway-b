@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text.Json.Serialization;
+using GradGateway.Api.Json;
 using GradGateway.Business.Interfaces;
 using GradGateway.Business.Options;
 using GradGateway.Business.Services;
@@ -17,6 +18,8 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
         options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+        options.JsonSerializerOptions.Converters.Add(new UtcDateTimeConverter());
+        options.JsonSerializerOptions.Converters.Add(new UtcNullableDateTimeConverter());
     });
 builder.Services.AddEndpointsApiExplorer();
 
@@ -78,7 +81,38 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer = $"https://securetoken.google.com/{firebaseProjectId}",
             ValidateAudience = true,
             ValidAudience = firebaseProjectId,
-            ValidateLifetime = true
+            ValidateLifetime = true,
+            NameClaimType = "user_id",
+        };
+
+        // SignalR WebSockets send the Firebase JWT as access_token on the query string.
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var path = context.HttpContext.Request.Path;
+                if (!path.StartsWithSegments("/hubs"))
+                {
+                    return Task.CompletedTask;
+                }
+
+                var token = context.Request.Query["access_token"].FirstOrDefault();
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    var authHeader = context.Request.Headers.Authorization.ToString();
+                    if (authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        token = authHeader["Bearer ".Length..].Trim();
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(token))
+                {
+                    context.Token = token;
+                }
+
+                return Task.CompletedTask;
+            }
         };
     });
 
@@ -96,8 +130,14 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Add SignalR
-builder.Services.AddSignalR();
+// Add SignalR (same UTC JSON handling as REST API)
+builder.Services.AddSignalR()
+    .AddJsonProtocol(options =>
+    {
+        options.PayloadSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        options.PayloadSerializerOptions.Converters.Add(new UtcDateTimeConverter());
+        options.PayloadSerializerOptions.Converters.Add(new UtcNullableDateTimeConverter());
+    });
 
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
 builder.Services.Configure<FirebaseAdminOptions>(builder.Configuration.GetSection(FirebaseAdminOptions.SectionName));
@@ -117,10 +157,13 @@ builder.Services.AddSingleton<IFirebaseAdminService, FirebaseAdminAuthService>()
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IStudentService, StudentService>();
 builder.Services.AddScoped<ICompanyService, CompanyService>();
+builder.Services.AddScoped<IInterviewPlanService, InterviewPlanService>();
 builder.Services.AddScoped<IOpportunityService, OpportunityService>();
 builder.Services.AddScoped<IApplicationService, ApplicationService>();
 builder.Services.AddScoped<IConversationService, ConversationService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IDeadlineNotificationProcessor, DeadlineNotificationProcessor>();
+builder.Services.AddHostedService<GradGateway.Api.Background.DeadlineNotificationBackgroundService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IEmailLogService, EmailLogService>();
 builder.Services.AddScoped<ICompanyTeamService, CompanyTeamService>();
@@ -128,14 +171,30 @@ builder.Services.AddScoped<IPlatformStatsService, PlatformStatsService>();
 builder.Services.AddSingleton<IRealtimeNotificationService>(sp =>
 {
     var hubContext = sp.GetRequiredService<IHubContext<GradGateway.Api.Hubs.ChatHub>>();
-    var service = new RealtimeNotificationService
+    var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
+
+    async Task SendToUserGroupAsync(Guid userId, string method, object data)
     {
-        SendMessageFunc = async (userId, data) => 
-            await hubContext.Clients.Group(userId.ToString()).SendAsync("ReceiveMessage", data),
-        SendConversationUpdateFunc = async (userId, data) => 
-            await hubContext.Clients.Group(userId.ToString()).SendAsync("ConversationUpdated", data)
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<GradGatewayDbContext>();
+        var firebaseUid = await db.Users.AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => u.FirebaseUid)
+            .FirstOrDefaultAsync();
+
+        if (!string.IsNullOrWhiteSpace(firebaseUid))
+        {
+            await hubContext.Clients.Group(firebaseUid).SendAsync(method, data);
+        }
+    }
+
+    return new RealtimeNotificationService
+    {
+        SendMessageFunc = (userId, data) => SendToUserGroupAsync(userId, "ReceiveMessage", data),
+        SendConversationUpdateFunc = (userId, data) => SendToUserGroupAsync(userId, "ConversationUpdated", data),
+        SendNotificationFunc = async (firebaseUid, data) =>
+            await hubContext.Clients.Group(firebaseUid).SendAsync("ReceiveNotification", data),
     };
-    return service;
 });
 
 var app = builder.Build();

@@ -1,4 +1,5 @@
 using GradGateway.Business.DTOs;
+using GradGateway.Business.Helpers;
 using GradGateway.Business.Interfaces;
 using GradGateway.Data.Context;
 using GradGateway.Data.Entities;
@@ -9,10 +10,17 @@ namespace GradGateway.Business.Services;
 public class OpportunityService : IOpportunityService
 {
     private readonly GradGatewayDbContext _context;
+    private readonly IDeadlineNotificationProcessor _deadlineProcessor;
+    private readonly IInterviewPlanService _interviewPlanService;
 
-    public OpportunityService(GradGatewayDbContext context)
+    public OpportunityService(
+        GradGatewayDbContext context,
+        IDeadlineNotificationProcessor deadlineProcessor,
+        IInterviewPlanService interviewPlanService)
     {
         _context = context;
+        _deadlineProcessor = deadlineProcessor;
+        _interviewPlanService = interviewPlanService;
     }
 
     public async Task<OpportunityResponseDto> CreateOpportunityAsync(string firebaseUid, CreateOpportunityRequestDto dto)
@@ -32,7 +40,7 @@ public class OpportunityService : IOpportunityService
             throw new ArgumentException("Invalid work mode.");
 
         var deadlineUtc = DateTime.SpecifyKind(dto.DeadlineAt.Date, DateTimeKind.Utc);
-        if (deadlineUtc < DateTime.UtcNow.Date)
+        if (deadlineUtc.Date < DeadlineClock.TodayDateInSriLanka())
             throw new ArgumentException("Deadline must be today or a future date.");
 
         var opportunity = new Opportunity
@@ -60,24 +68,40 @@ public class OpportunityService : IOpportunityService
 
     public async Task<List<OpportunityResponseDto>> GetActiveOpportunitiesAsync()
     {
+        var feed = await GetStudentOpeningsFeedAsync();
+        return feed.Active;
+    }
+
+    public async Task<StudentOpeningsFeedDto> GetStudentOpeningsFeedAsync()
+    {
         await EnsureDemoOpportunitiesAsync();
         await AutoExpireOpportunitiesAsync();
 
-        var todayUtc = DateTime.UtcNow.Date;
+        var todaySl = DeadlineClock.TodayDateInSriLanka();
 
         var rows = await _context.Opportunities
             .Include(o => o.CompanyProfile)
-            .Where(o => o.IsActive && o.DeadlineAt.Date >= todayUtc)
+            .Where(o => o.IsActive && o.DeadlineAt.Date >= todaySl)
             .OrderByDescending(o => o.CreatedAt)
             .ToListAsync();
 
-        return rows.Select(o => ToResponse(o, o.CompanyProfile.CompanyName, o.CompanyProfile.LogoDataUrl)).ToList();
+        var expiredCount = await _context.Opportunities.CountAsync(o =>
+            !o.IsActive || o.DeadlineAt.Date < todaySl);
+
+        return new StudentOpeningsFeedDto(
+            rows.Select(o => ToResponse(o, o.CompanyProfile.CompanyName, o.CompanyProfile.LogoDataUrl)).ToList(),
+            expiredCount);
+    }
+
+    public async Task<int> GetExpiredOpportunitiesCountAsync()
+    {
+        var feed = await GetStudentOpeningsFeedAsync();
+        return feed.ExpiredCount;
     }
 
     public async Task<List<OpportunityResponseDto>> GetCompanyOpportunitiesAsync(string firebaseUid)
     {
         await AutoExpireOpportunitiesAsync();
-        await SendDeadlinePassedNotificationsAsync();
 
         var user = await _context.Users.FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid);
         if (user == null || user.Role != UserRole.Company)
@@ -178,9 +202,9 @@ public class OpportunityService : IOpportunityService
     {
         var now = DateTime.UtcNow;
 
-        var todayUtc = now.Date;
+        var todaySl = DeadlineClock.TodayDateInSriLanka();
         var expiredActiveRows = await _context.Opportunities
-            .Where(o => o.IsActive && o.DeadlineAt.Date < todayUtc)
+            .Where(o => o.IsActive && o.DeadlineAt.Date < todaySl)
             .ToListAsync();
 
         if (!expiredActiveRows.Any())
@@ -195,215 +219,12 @@ public class OpportunityService : IOpportunityService
         }
 
         await _context.SaveChangesAsync();
-        await SendDeadlinePassedNotificationsAsync();
+        await _deadlineProcessor.ProcessExpiredOpportunityDeadlinesAsync();
     }
 
-    public async Task<ScheduleInterviewsResultDto> ScheduleInterviewsAsync(
+    public Task<ScheduleInterviewsResultDto> ScheduleInterviewsAsync(
         string firebaseUid,
         Guid opportunityId,
         ScheduleInterviewsRequestDto dto)
-    {
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid)
-                   ?? throw new InvalidOperationException("User not found.");
-
-        if (user.Role != UserRole.Company)
-            throw new InvalidOperationException("Only company users can schedule interviews.");
-
-        var company = await _context.CompanyProfiles.FirstOrDefaultAsync(c => c.UserId == user.Id)
-                      ?? throw new InvalidOperationException("Company profile not found.");
-
-        var opportunity = await _context.Opportunities
-            .Include(o => o.CompanyProfile)
-            .FirstOrDefaultAsync(o => o.Id == opportunityId && o.CompanyProfileId == company.Id)
-            ?? throw new ArgumentException("Opportunity not found.");
-
-        if (!Enum.TryParse<InterviewMode>(dto.Mode, true, out var interviewMode))
-            throw new ArgumentException("Invalid interview mode. Use Online, Onsite, or Phone.");
-
-        var scheduledAt = DateTime.SpecifyKind(dto.ScheduledAt.Date, DateTimeKind.Utc);
-        if (scheduledAt < DateTime.UtcNow.Date)
-            throw new ArgumentException("Interview date must be today or in the future.");
-
-        var durationMinutes = dto.DurationMinutes is > 0 and <= 480 ? dto.DurationMinutes : 60;
-
-        var shortlisted = await _context.Applications
-            .Include(a => a.StudentProfile)
-            .Where(a => a.OpportunityId == opportunityId && a.Status == ApplicationStatus.Shortlisted)
-            .ToListAsync();
-
-        var messagesSent = 0;
-        var interviewsScheduled = 0;
-        var companyName = opportunity.CompanyProfile.CompanyName;
-        var messageContent = BuildInterviewChatMessage(
-            opportunity.Title,
-            companyName,
-            scheduledAt,
-            durationMinutes,
-            interviewMode,
-            dto.MeetingLink,
-            dto.Location,
-            dto.Notes);
-
-        foreach (var application in shortlisted)
-        {
-            var interview = await _context.Interviews
-                .FirstOrDefaultAsync(i => i.ApplicationId == application.Id && i.Status == InterviewStatus.Scheduled);
-
-            if (interview == null)
-            {
-                interview = new Interview
-                {
-                    Id = Guid.NewGuid(),
-                    ApplicationId = application.Id,
-                    ScheduledAt = scheduledAt,
-                    Mode = interviewMode,
-                    MeetingLink = dto.MeetingLink,
-                    Location = dto.Location,
-                    Status = InterviewStatus.Scheduled,
-                    Notes = FormatInterviewNotes(durationMinutes, dto.Notes),
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
-                _context.Interviews.Add(interview);
-            }
-            else
-            {
-                interview.ScheduledAt = scheduledAt;
-                interview.Mode = interviewMode;
-                interview.MeetingLink = dto.MeetingLink;
-                interview.Location = dto.Location;
-                interview.Notes = FormatInterviewNotes(durationMinutes, dto.Notes);
-                interview.UpdatedAt = DateTime.UtcNow;
-            }
-
-            interviewsScheduled++;
-
-            var conversation = await _context.Conversations
-                .FirstOrDefaultAsync(c => c.StudentProfileId == application.StudentProfileId
-                                       && c.CompanyProfileId == company.Id);
-
-            if (conversation == null)
-            {
-                conversation = new Conversation
-                {
-                    Id = Guid.NewGuid(),
-                    StudentProfileId = application.StudentProfileId,
-                    CompanyProfileId = company.Id,
-                    OpportunityId = opportunityId,
-                    CreatedAt = DateTime.UtcNow,
-                    LastMessageAt = DateTime.UtcNow
-                };
-                _context.Conversations.Add(conversation);
-            }
-            else if (conversation.OpportunityId == null)
-            {
-                conversation.OpportunityId = opportunityId;
-            }
-
-            var sentAt = DateTime.UtcNow;
-            _context.Messages.Add(new Message
-            {
-                Id = Guid.NewGuid(),
-                ConversationId = conversation.Id,
-                SenderUserId = user.Id,
-                Content = messageContent,
-                IsRead = false,
-                SentAt = sentAt
-            });
-            conversation.LastMessageAt = sentAt;
-            messagesSent++;
-
-            _context.Notifications.Add(new Notification
-            {
-                Id = Guid.NewGuid(),
-                UserId = application.StudentProfile.UserId,
-                Type = NotificationType.Message,
-                Title = "Interview invitation",
-                Body = $"You have a new interview invitation for {opportunity.Title} at {companyName}.",
-                RelatedOpportunityId = opportunityId,
-                IsRead = false,
-                CreatedAt = sentAt
-            });
-        }
-
-        await _context.SaveChangesAsync();
-
-        return new ScheduleInterviewsResultDto(
-            opportunityId,
-            opportunity.Title,
-            shortlisted.Count,
-            messagesSent,
-            interviewsScheduled);
-    }
-
-    private async Task SendDeadlinePassedNotificationsAsync()
-    {
-        var todayUtc = DateTime.UtcNow.Date;
-
-        var expired = await _context.Opportunities
-            .Include(o => o.CompanyProfile)
-            .Where(o => !o.DeadlineNotificationSent && o.DeadlineAt.Date < todayUtc)
-            .ToListAsync();
-
-        if (!expired.Any())
-        {
-            return;
-        }
-
-        foreach (var opportunity in expired)
-        {
-            var shortlistedCount = await _context.Applications
-                .CountAsync(a => a.OpportunityId == opportunity.Id && a.Status == ApplicationStatus.Shortlisted);
-
-            _context.Notifications.Add(new Notification
-            {
-                Id = Guid.NewGuid(),
-                UserId = opportunity.CompanyProfile.UserId,
-                Type = NotificationType.Opportunity,
-                Title = "Application deadline passed",
-                Body = shortlistedCount > 0
-                    ? $"The deadline for \"{opportunity.Title}\" has passed. You have {shortlistedCount} shortlisted candidate(s). Schedule interviews to notify them in chat."
-                    : $"The deadline for \"{opportunity.Title}\" has passed. Schedule interviews when you have shortlisted candidates.",
-                RelatedOpportunityId = opportunity.Id,
-                IsRead = false,
-                CreatedAt = DateTime.UtcNow
-            });
-
-            opportunity.DeadlineNotificationSent = true;
-            opportunity.UpdatedAt = DateTime.UtcNow;
-        }
-
-        await _context.SaveChangesAsync();
-    }
-
-    private static string FormatInterviewNotes(int durationMinutes, string? notes)
-    {
-        var durationLine = $"Duration: {durationMinutes} minutes";
-        return string.IsNullOrWhiteSpace(notes) ? durationLine : $"{durationLine}\n{notes.Trim()}";
-    }
-
-    private static string BuildInterviewChatMessage(
-        string jobTitle,
-        string companyName,
-        DateTime scheduledAt,
-        int durationMinutes,
-        InterviewMode mode,
-        string? meetingLink,
-        string? location,
-        string? notes)
-    {
-        var interviewData = new
-        {
-            role = jobTitle,
-            company = companyName,
-            date = scheduledAt.ToString("dddd, MMMM d, yyyy"),
-            duration = $"{durationMinutes} minutes",
-            format = mode.ToString(),
-            meetingLink = meetingLink?.Trim(),
-            location = location?.Trim(),
-            notes = notes?.Trim()
-        };
-
-        return $"INTERVIEW_INVITATION::{System.Text.Json.JsonSerializer.Serialize(interviewData)}";
-    }
+        => _interviewPlanService.SavePlanAsync(firebaseUid, opportunityId, dto);
 }

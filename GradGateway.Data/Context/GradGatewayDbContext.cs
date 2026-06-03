@@ -23,6 +23,7 @@ public class GradGatewayDbContext : DbContext
     public DbSet<Skill> Skills { get; set; }
     public DbSet<StudentSkill> StudentSkills { get; set; }
     public DbSet<Interview> Interviews { get; set; }
+    public DbSet<OpportunityInterviewPlan> OpportunityInterviewPlans { get; set; }
     public DbSet<Document> Documents { get; set; }
     public DbSet<EmailLog> EmailLogs { get; set; }
     public DbSet<CompanyTeamMember> CompanyTeamMembers { get; set; }
@@ -396,7 +397,9 @@ public class GradGatewayDbContext : DbContext
         {
             entity.HasIndex(p => p.OpportunityId);
             entity.HasIndex(p => p.StudentProfileId);
-            entity.HasIndex(p => new { p.OpportunityId, p.StudentProfileId }).IsUnique();
+            entity.HasIndex(p => new { p.OpportunityId, p.StudentProfileId })
+                .IsUnique()
+                .HasFilter("[OpportunityId] IS NOT NULL");
 
             entity.HasOne(p => p.Opportunity)
                 .WithMany()
@@ -507,6 +510,16 @@ public class GradGatewayDbContext : DbContext
             entity.HasOne(p => p.Skill)
                 .WithMany()
                 .HasForeignKey(p => p.SkillId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<OpportunityInterviewPlan>(entity =>
+        {
+            entity.HasIndex(p => p.OpportunityId).IsUnique();
+
+            entity.HasOne(p => p.Opportunity)
+                .WithMany()
+                .HasForeignKey(p => p.OpportunityId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

@@ -116,4 +116,44 @@ public class CompanyService : ICompanyService
             profile.Position
         );
     }
+
+    public async Task<CompanyPublicProfileDto?> GetPublicCompanyProfileAsync(Guid companyProfileId)
+    {
+        var profile = await _context.CompanyProfiles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == companyProfileId);
+
+        if (profile == null)
+            return null;
+
+        var openings = await _context.Opportunities
+            .AsNoTracking()
+            .Where(o => o.CompanyProfileId == companyProfileId && o.IsActive)
+            .OrderByDescending(o => o.CreatedAt)
+            .Select(o => new CompanyPublicOpeningDto(
+                o.Id,
+                o.Title,
+                o.Location,
+                o.OpportunityType.ToString(),
+                o.WorkMode.ToString(),
+                o.DeadlineAt,
+                o.MonthlyStipendLkr,
+                o.CreatedAt))
+            .ToListAsync();
+
+        return new CompanyPublicProfileDto(
+            profile.Id,
+            profile.CompanyName,
+            profile.CompanyEmail,
+            profile.Phone,
+            profile.Website,
+            profile.Industry,
+            profile.LogoDataUrl,
+            profile.RecruiterName,
+            profile.RecruiterEmail,
+            profile.RecruiterPhone,
+            profile.Position,
+            openings.Count,
+            openings);
+    }
 }

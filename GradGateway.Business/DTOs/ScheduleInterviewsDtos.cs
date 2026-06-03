@@ -1,12 +1,15 @@
 namespace GradGateway.Business.DTOs;
 
 public record ScheduleInterviewsRequestDto(
-    DateTime ScheduledAt,
+    /// <summary>Calendar dates as yyyy-MM-dd (preferred).</summary>
+    List<string>? TentativeDates,
+    DateTime? ScheduledAt,
     int DurationMinutes,
     string Mode,
     string? MeetingLink,
     string? Location,
-    string? Notes
+    string? Notes,
+    bool NotifyExistingShortlisted = true
 );
 
 public record ScheduleInterviewsResultDto(
@@ -14,5 +17,18 @@ public record ScheduleInterviewsResultDto(
     string JobTitle,
     int ShortlistedCount,
     int MessagesSent,
-    int InterviewsScheduled
+    int InterviewsScheduled,
+    bool PlanSaved
+);
+
+public record OpportunityInterviewPlanDto(
+    Guid OpportunityId,
+    IReadOnlyList<string> TentativeDates,
+    int DurationMinutes,
+    string Mode,
+    string? MeetingLink,
+    string? Location,
+    string? Notes,
+    DateTime? UpdatedAt,
+    int ShortlistedCount
 );

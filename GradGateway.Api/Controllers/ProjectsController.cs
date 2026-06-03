@@ -18,6 +18,23 @@ public class ProjectsController : ControllerBase
         _service = service;
     }
 
+    [HttpGet("student/{studentProfileId:guid}")]
+    public async Task<IActionResult> GetByStudentProfileId(Guid studentProfileId)
+    {
+        var uid = GetFirebaseUid();
+        if (string.IsNullOrWhiteSpace(uid)) return Unauthorized(new { message = "Invalid token" });
+
+        try
+        {
+            var result = await _service.GetProjectsByStudentProfileIdAsync(uid, studentProfileId);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpGet("me")]
     public async Task<IActionResult> GetMine()
     {

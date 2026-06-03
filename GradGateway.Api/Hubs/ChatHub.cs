@@ -29,7 +29,8 @@ public class ChatHub : Hub
 
     private string? GetUserId()
     {
-        return Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value 
-            ?? Context.User?.FindFirst("user_id")?.Value;
+        return Context.User?.FindFirst("user_id")?.Value
+            ?? Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? Context.User?.FindFirst("sub")?.Value;
     }
 }

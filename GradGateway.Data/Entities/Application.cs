@@ -6,7 +6,10 @@ public enum ApplicationStatus
     Shortlisted,
     Rejected,
     Hired,
-    OfferSent
+    OfferSent,
+    Interviewed,
+    /// <summary>Student accepted a direct job offer (open for interview).</summary>
+    OfferAccepted
 }
 
 public class Application
@@ -28,4 +31,7 @@ public class Application
     public ApplicationStatus Status { get; set; } = ApplicationStatus.Pending;
     public DateTime AppliedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>When the current interview plan was last sent to this applicant in chat.</summary>
+    public DateTime? InterviewPlanNotifiedAt { get; set; }
 }
