@@ -356,6 +356,10 @@ public class ConversationService : IConversationService
             Title = "New message",
             Body = "You received a new message.",
             RelatedOpportunityId = convo.OpportunityId,
+            RelatedConversationId = conversationId,
+            RelatedStudentProfileId = user.Role == UserRole.Student
+                ? convo.StudentProfileId
+                : null,
             IsRead = false,
             CreatedAt = DateTime.UtcNow
         };
@@ -391,7 +395,10 @@ public class ConversationService : IConversationService
                         messageNotification.Body,
                         messageNotification.IsRead,
                         messageNotification.CreatedAt,
-                        messageNotification.RelatedOpportunityId
+                        messageNotification.RelatedOpportunityId,
+                        messageNotification.RelatedApplicationId,
+                        messageNotification.RelatedConversationId,
+                        messageNotification.RelatedStudentProfileId
                     );
                     await _realtimeNotification.NotifyNotificationAsync(recipient.FirebaseUid, notificationDto);
                 }
@@ -409,7 +416,10 @@ public class ConversationService : IConversationService
                             offerResponseNotification.Body,
                             offerResponseNotification.IsRead,
                             offerResponseNotification.CreatedAt,
-                            offerResponseNotification.RelatedOpportunityId
+                            offerResponseNotification.RelatedOpportunityId,
+                            offerResponseNotification.RelatedApplicationId,
+                            offerResponseNotification.RelatedConversationId,
+                            offerResponseNotification.RelatedStudentProfileId
                         );
                         await _realtimeNotification.NotifyNotificationAsync(companyUser.FirebaseUid, offerNotifDto);
                     }

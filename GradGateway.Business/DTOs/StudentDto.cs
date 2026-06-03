@@ -15,7 +15,8 @@ public record StudentRegistrationDto(
     string? FieldOfMajor = null,
     string? Availability = "Available Now",
     IReadOnlyList<string>? Certifications = null,
-    IReadOnlyList<string>? Awards = null
+    IReadOnlyList<string>? Awards = null,
+    string? CvUrl = null
 );
 
 public record StudentProfileResponseDto(
@@ -33,7 +34,8 @@ public record StudentProfileResponseDto(
     decimal Gpa,
     string Availability,
     IReadOnlyList<string> Certifications,
-    IReadOnlyList<string> Awards
+    IReadOnlyList<string> Awards,
+    string? CvUrl = null
 );
 
 public record StudentDirectoryItemDto(
@@ -48,5 +50,6 @@ public record StudentDirectoryItemDto(
     string Email,
     string Skills,
     string? PhotoDataUrl,
-    string Availability
+    string Availability,
+    string? CvUrl = null
 );

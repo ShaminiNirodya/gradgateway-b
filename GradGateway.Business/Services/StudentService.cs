@@ -67,6 +67,7 @@ public class StudentService : IStudentService
                 FullName = dto.FullName,
                 Phone = dto.Phone,
                 PhotoDataUrl = dto.PhotoDataUrl,
+                CvUrl = NormalizeCvUrl(dto.CvUrl),
                 University = dto.University,
                 StudentId = ResolveStudentId(dto.StudentId, user.Id),
                 Degree = dto.Degree,
@@ -87,6 +88,7 @@ public class StudentService : IStudentService
             profile.FullName = dto.FullName;
             profile.Phone = dto.Phone;
             profile.PhotoDataUrl = dto.PhotoDataUrl;
+            profile.CvUrl = NormalizeCvUrl(dto.CvUrl);
             profile.University = dto.University;
             profile.StudentId = string.IsNullOrWhiteSpace(dto.StudentId)
                 ? profile.StudentId
@@ -135,9 +137,13 @@ public class StudentService : IStudentService
             profile.Gpa,
             profile.Availability,
             DeserializeStringList(profile.CertificationsJson),
-            DeserializeStringList(profile.AwardsJson)
+            DeserializeStringList(profile.AwardsJson),
+            profile.CvUrl
         );
     }
+
+    private static string? NormalizeCvUrl(string? cvUrl) =>
+        string.IsNullOrWhiteSpace(cvUrl) ? null : cvUrl.Trim();
 
     private static string ResolveStudentId(string? requestedStudentId, Guid userId)
     {
@@ -196,7 +202,8 @@ public class StudentService : IStudentService
             profile.Gpa,
             profile.Availability,
             DeserializeStringList(profile.CertificationsJson),
-            DeserializeStringList(profile.AwardsJson)
+            DeserializeStringList(profile.AwardsJson),
+            profile.CvUrl
         );
     }
 
@@ -388,7 +395,8 @@ public class StudentService : IStudentService
                 s.User.Email,
                 skillText,
                 s.PhotoDataUrl,
-                s.Availability
+                s.Availability,
+                s.CvUrl
             );
         });
 
@@ -406,6 +414,12 @@ public class StudentService : IStudentService
                 d.Skills.ToLower().Contains(term)
             )
             .ToList();
+    }
+
+    public async Task<StudentDirectoryItemDto?> GetStudentDirectoryItemByProfileIdAsync(Guid studentProfileId)
+    {
+        var rows = await GetStudentDirectoryAsync(null);
+        return rows.FirstOrDefault(r => r.StudentProfileId == studentProfileId);
     }
 
     private async Task EnsureStudentDemoDataAsync(User studentUser, StudentProfile studentProfile)

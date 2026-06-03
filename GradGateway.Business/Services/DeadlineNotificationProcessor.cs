@@ -70,7 +70,10 @@ public class DeadlineNotificationProcessor : IDeadlineNotificationProcessor
                     notification.Body,
                     notification.IsRead,
                     notification.CreatedAt,
-                    notification.RelatedOpportunityId
+                    notification.RelatedOpportunityId,
+                    notification.RelatedApplicationId,
+                    notification.RelatedConversationId,
+                    notification.RelatedStudentProfileId
                 );
 
                 try

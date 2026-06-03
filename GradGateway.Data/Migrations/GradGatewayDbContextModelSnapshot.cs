@@ -623,6 +623,15 @@ namespace GradGateway.Data.Migrations
                     b.Property<Guid?>("RelatedOpportunityId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("RelatedApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("RelatedConversationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("RelatedStudentProfileId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -1140,6 +1149,9 @@ namespace GradGateway.Data.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PhotoDataUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CvUrl")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("StudentId")

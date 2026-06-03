@@ -19,6 +19,9 @@ public class Notification
     public string Title { get; set; } = string.Empty;
     public string Body { get; set; } = string.Empty;
     public Guid? RelatedOpportunityId { get; set; }
+    public Guid? RelatedApplicationId { get; set; }
+    public Guid? RelatedConversationId { get; set; }
+    public Guid? RelatedStudentProfileId { get; set; }
     public bool IsRead { get; set; } = false;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

@@ -118,6 +118,35 @@ public class StudentsController : ControllerBase
         }
     }
 
+    [HttpGet("{studentProfileId:guid}/directory-entry")]
+    [Authorize]
+    public async Task<IActionResult> GetStudentDirectoryEntry(Guid studentProfileId)
+    {
+        try
+        {
+            var firebaseUid = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                           ?? User.FindFirst("user_id")?.Value;
+
+            if (string.IsNullOrWhiteSpace(firebaseUid))
+            {
+                return Unauthorized(new { message = "Invalid token: Firebase UID not found" });
+            }
+
+            var entry = await _studentService.GetStudentDirectoryItemByProfileIdAsync(studentProfileId);
+            if (entry == null)
+            {
+                return NotFound(new { message = "Student not found" });
+            }
+
+            return Ok(entry);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting student directory entry {StudentProfileId}", studentProfileId);
+            return StatusCode(500, new { message = "An error occurred while retrieving student profile" });
+        }
+    }
+
     [HttpGet("directory")]
     [Authorize]
     public async Task<IActionResult> GetStudentDirectory([FromQuery] string? q = null)

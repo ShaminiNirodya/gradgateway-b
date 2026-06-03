@@ -9,6 +9,8 @@ public class StudentProfile
     public string FullName { get; set; } = string.Empty;
     public string Phone { get; set; } = string.Empty;
     public string? PhotoDataUrl { get; set; }
+    /// <summary>Firebase Storage download URL for the student's CV (PDF/DOC).</summary>
+    public string? CvUrl { get; set; }
 
     public string University { get; set; } = string.Empty;
     public string StudentId { get; set; } = string.Empty;

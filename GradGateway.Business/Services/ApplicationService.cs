@@ -84,6 +84,8 @@ public class ApplicationService : IApplicationService
             Title = "New Application",
             Body = $"{student.FullName} applied for {opportunity.Title}.",
             RelatedOpportunityId = dto.OpportunityId,
+            RelatedApplicationId = app.Id,
+            RelatedStudentProfileId = student.Id,
             IsRead = false,
             CreatedAt = DateTime.UtcNow
         };
@@ -288,6 +290,7 @@ public class ApplicationService : IApplicationService
                 Title = "Application Status Updated",
                 Body = $"Your application for {jobTitle} is now {parsed}.",
                 RelatedOpportunityId = app.OpportunityId,
+                RelatedApplicationId = app.Id,
                 IsRead = false,
                 CreatedAt = DateTime.UtcNow
             };
@@ -442,6 +445,9 @@ public class ApplicationService : IApplicationService
             Type = NotificationType.Application,
             Title = "Job Offer Received",
             Body = $"{company.CompanyName} sent you a job offer for {jobTitle}.",
+            RelatedOpportunityId = app.OpportunityId,
+            RelatedApplicationId = app.Id,
+            RelatedStudentProfileId = student.Id,
             IsRead = false,
             CreatedAt = DateTime.UtcNow
         };
@@ -538,6 +544,10 @@ public class ApplicationService : IApplicationService
             Body = accepted
                 ? $"{student.FullName} is open for an interview for {jobTitle}."
                 : $"{student.FullName} declined the offer for {jobTitle}.",
+            RelatedOpportunityId = app.OpportunityId,
+            RelatedApplicationId = app.Id,
+            RelatedConversationId = conversationId,
+            RelatedStudentProfileId = student.Id,
             IsRead = false,
             CreatedAt = DateTime.UtcNow
         };
@@ -1076,12 +1086,14 @@ public class ApplicationService : IApplicationService
         {
             Id = Guid.NewGuid(),
             UserId = student.UserId,
-            Type = NotificationType.Message,
+            Type = hired ? NotificationType.Application : NotificationType.Message,
             Title = hired ? "Congratulations — you're hired!" : "Application update",
             Body = hired
                 ? $"{companyName} hired you for {jobTitle}. Open Messages to read their note."
                 : $"{companyName} shared an update about your application for {jobTitle}. Open Messages to read their note.",
             RelatedOpportunityId = app.OpportunityId,
+            RelatedApplicationId = app.Id,
+            RelatedConversationId = conversation.Id,
             IsRead = false,
             CreatedAt = sentAt
         };

@@ -7,5 +7,8 @@ public record NotificationResponseDto(
     string Body,
     bool IsRead,
     DateTime CreatedAt,
-    Guid? RelatedOpportunityId
+    Guid? RelatedOpportunityId,
+    Guid? RelatedApplicationId = null,
+    Guid? RelatedConversationId = null,
+    Guid? RelatedStudentProfileId = null
 );
