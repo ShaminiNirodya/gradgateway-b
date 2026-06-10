@@ -59,6 +59,10 @@ public class AuthController : ControllerBase
         {
             return BadRequest(new { message = ex.Message });
         }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(403, new { message = ex.Message });
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error syncing user");
@@ -91,6 +95,10 @@ public class AuthController : ControllerBase
             }
 
             return Ok(user);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(403, new { message = ex.Message });
         }
         catch (Exception ex)
         {

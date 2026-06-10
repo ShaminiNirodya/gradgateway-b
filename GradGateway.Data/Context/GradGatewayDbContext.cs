@@ -27,6 +27,8 @@ public class GradGatewayDbContext : DbContext
     public DbSet<Document> Documents { get; set; }
     public DbSet<EmailLog> EmailLogs { get; set; }
     public DbSet<CompanyTeamMember> CompanyTeamMembers { get; set; }
+    public DbSet<PlatformSettings> PlatformSettings { get; set; }
+    public DbSet<SupportInquiry> SupportInquiries { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -105,6 +107,16 @@ public class GradGatewayDbContext : DbContext
         var documentId1 = Guid.Parse("b2b2b2b2-1111-2222-3333-444444444444");
         var documentId2 = Guid.Parse("b2b2b2b2-1111-2222-3333-555555555555");
         var documentId3 = Guid.Parse("b2b2b2b2-1111-2222-3333-666666666666");
+        var platformSettingsId = Guid.Parse("f0f0f0f0-1111-2222-3333-444444444444");
+
+        modelBuilder.Entity<PlatformSettings>().HasData(new PlatformSettings
+        {
+            Id = platformSettingsId,
+            AllowRegistration = true,
+            RequireCompanyVerification = false,
+            MaintenanceMode = false,
+            UpdatedAt = seedUpdatedAt
+        });
 
         // Seed users
         modelBuilder.Entity<User>().HasData(new User
@@ -113,6 +125,7 @@ public class GradGatewayDbContext : DbContext
             FirebaseUid = "CffvlJMXIlUM3FRQzNyu80hXBkU2", 
             Email = "admin@gradgateway.com",
             Role = UserRole.Admin,
+            IsActive = true,
             CreatedAt = seedCreatedAt
         },
         new User
@@ -121,6 +134,7 @@ public class GradGatewayDbContext : DbContext
             FirebaseUid = "demo-student-uid-001",
             Email = "student.demo@uom.lk",
             Role = UserRole.Student,
+            IsActive = true,
             CreatedAt = seedCreatedAt
         },
         new User
@@ -129,6 +143,7 @@ public class GradGatewayDbContext : DbContext
             FirebaseUid = "demo-student-uid-002",
             Email = "nethmi.perera@eng.pdn.ac.lk",
             Role = UserRole.Student,
+            IsActive = true,
             CreatedAt = seedCreatedAt
         },
         new User
@@ -137,6 +152,7 @@ public class GradGatewayDbContext : DbContext
             FirebaseUid = "demo-student-uid-003",
             Email = "sahan.jayasinghe@stu.cmb.ac.lk",
             Role = UserRole.Student,
+            IsActive = true,
             CreatedAt = seedCreatedAt
         },
         new User
@@ -145,6 +161,7 @@ public class GradGatewayDbContext : DbContext
             FirebaseUid = "demo-student-uid-004",
             Email = "tharushi.senanayake@jfn.ac.lk",
             Role = UserRole.Student,
+            IsActive = true,
             CreatedAt = seedCreatedAt
         },
         new User
@@ -153,6 +170,7 @@ public class GradGatewayDbContext : DbContext
             FirebaseUid = "demo-company-uid-001",
             Email = "company.demo@sample.lk",
             Role = UserRole.Company,
+            IsActive = true,
             CreatedAt = seedCreatedAt
         },
         new User
@@ -161,6 +179,7 @@ public class GradGatewayDbContext : DbContext
             FirebaseUid = "demo-company-uid-002",
             Email = "careers@dialog.lk",
             Role = UserRole.Company,
+            IsActive = true,
             CreatedAt = seedCreatedAt
         },
         new User
@@ -169,6 +188,7 @@ public class GradGatewayDbContext : DbContext
             FirebaseUid = "demo-company-uid-003",
             Email = "internships@wso2.com",
             Role = UserRole.Company,
+            IsActive = true,
             CreatedAt = seedCreatedAt
         },
         new User
@@ -177,6 +197,7 @@ public class GradGatewayDbContext : DbContext
             FirebaseUid = "demo-company-uid-004",
             Email = "hr@virtusa.com",
             Role = UserRole.Company,
+            IsActive = true,
             CreatedAt = seedCreatedAt
         });
 
@@ -324,6 +345,8 @@ public class GradGatewayDbContext : DbContext
             RecruiterEmail = "anjana@demotech.lk",
             RecruiterPhone = "+94770111222",
             Position = "HR Manager",
+            VerificationStatus = CompanyVerificationStatus.Approved,
+            VerifiedAt = seedCreatedAt,
             CreatedAt = seedCreatedAt,
             UpdatedAt = seedUpdatedAt
         },
@@ -341,6 +364,8 @@ public class GradGatewayDbContext : DbContext
             RecruiterEmail = "kasun.rodrigo@dialog.lk",
             RecruiterPhone = "+94771239876",
             Position = "Talent Acquisition Executive",
+            VerificationStatus = CompanyVerificationStatus.Approved,
+            VerifiedAt = seedCreatedAt,
             CreatedAt = seedCreatedAt,
             UpdatedAt = seedUpdatedAt
         },
@@ -358,6 +383,8 @@ public class GradGatewayDbContext : DbContext
             RecruiterEmail = "ishara.fernando@wso2.com",
             RecruiterPhone = "+94712340987",
             Position = "Campus Recruiter",
+            VerificationStatus = CompanyVerificationStatus.Approved,
+            VerifiedAt = seedCreatedAt,
             CreatedAt = seedCreatedAt,
             UpdatedAt = seedUpdatedAt
         },
@@ -375,6 +402,8 @@ public class GradGatewayDbContext : DbContext
             RecruiterEmail = "dinithi.abeywickrama@virtusa.com",
             RecruiterPhone = "+94770123456",
             Position = "Associate Manager - Talent",
+            VerificationStatus = CompanyVerificationStatus.Approved,
+            VerifiedAt = seedCreatedAt,
             CreatedAt = seedCreatedAt,
             UpdatedAt = seedUpdatedAt
         });

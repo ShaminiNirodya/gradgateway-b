@@ -81,7 +81,11 @@ public class OpportunityService : IOpportunityService
 
         var rows = await _context.Opportunities
             .Include(o => o.CompanyProfile)
-            .Where(o => o.IsActive && o.DeadlineAt.Date >= todaySl)
+                .ThenInclude(c => c.User)
+            .Where(o =>
+                o.IsActive &&
+                o.DeadlineAt.Date >= todaySl &&
+                o.CompanyProfile.User.IsActive)
             .OrderByDescending(o => o.CreatedAt)
             .ToListAsync();
 

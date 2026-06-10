@@ -332,6 +332,7 @@ public class StudentService : IStudentService
 
         var rows = await _context.StudentProfiles
             .Include(s => s.User)
+            .Where(s => s.User.IsActive)
             .OrderByDescending(s => s.UpdatedAt)
             .ToListAsync();
 

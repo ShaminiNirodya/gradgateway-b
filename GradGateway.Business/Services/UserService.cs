@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using GradGateway.Business.DTOs;
+using GradGateway.Business.Helpers;
 using GradGateway.Business.Interfaces;
 using GradGateway.Data.Context;
 using GradGateway.Data.Entities;
@@ -33,6 +34,7 @@ public class UserService : IUserService
 
     public async Task<UserResponseDto?> GetOrCreateUserAsync(UserRegistrationDto dto)
     {
+        var settings = await PlatformSettingsAccessor.GetOrCreateAsync(_context);
         var user = await _context.Users.FirstOrDefaultAsync(u => u.FirebaseUid == dto.FirebaseUid);
         
         if (user == null)
@@ -40,6 +42,16 @@ public class UserService : IUserService
             if (!Enum.TryParse<UserRole>(dto.Role, true, out var userRole))
             {
                 throw new ArgumentException($"Invalid role: {dto.Role}");
+            }
+
+            if (userRole == UserRole.Admin)
+            {
+                throw new InvalidOperationException("Admin accounts cannot be created through registration.");
+            }
+
+            if (!settings.AllowRegistration)
+            {
+                throw new InvalidOperationException("New registrations are currently disabled.");
             }
 
             user = new User
@@ -54,6 +66,10 @@ public class UserService : IUserService
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
         }
+        else
+        {
+            EnsureUserMayAccessPlatform(user, settings);
+        }
 
         return new UserResponseDto(user.Email, user.Role.ToString(), user.FirebaseUid);
     }
@@ -67,7 +83,23 @@ public class UserService : IUserService
             return null;
         }
 
+        var settings = await PlatformSettingsAccessor.GetOrCreateAsync(_context);
+        EnsureUserMayAccessPlatform(user, settings);
+
         return new UserResponseDto(user.Email, user.Role.ToString(), user.FirebaseUid);
+    }
+
+    private static void EnsureUserMayAccessPlatform(User user, PlatformSettings settings)
+    {
+        if (!user.IsActive)
+        {
+            throw new InvalidOperationException("This account has been suspended. Contact support.");
+        }
+
+        if (settings.MaintenanceMode && user.Role != UserRole.Admin)
+        {
+            throw new InvalidOperationException("The platform is under maintenance. Please try again later.");
+        }
     }
 
     public async Task<int> GetUserCountAsync()

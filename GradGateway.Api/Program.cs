@@ -5,10 +5,13 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text.Json.Serialization;
 using GradGateway.Api.Json;
+using GradGateway.Api.Authorization;
+using GradGateway.Api.Middleware;
 using GradGateway.Business.Interfaces;
 using GradGateway.Business.Options;
 using GradGateway.Business.Services;
 using GradGateway.Data.Context;
+using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -116,7 +119,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy => policy.Requirements.Add(new AdminRoleRequirement()));
+});
+builder.Services.AddScoped<IAuthorizationHandler, AdminRoleHandler>();
 
 // Configure CORS for Next.js frontend
 builder.Services.AddCors(options =>
@@ -168,6 +175,8 @@ builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IEmailLogService, EmailLogService>();
 builder.Services.AddScoped<ICompanyTeamService, CompanyTeamService>();
 builder.Services.AddScoped<IPlatformStatsService, PlatformStatsService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
+builder.Services.AddScoped<ISupportInquiryService, SupportInquiryService>();
 builder.Services.AddSingleton<IRealtimeNotificationService>(sp =>
 {
     var hubContext = sp.GetRequiredService<IHubContext<GradGateway.Api.Hubs.ChatHub>>();
@@ -226,6 +235,7 @@ if (!app.Environment.IsDevelopment())
 app.UseCors("FrontendPolicy");
 
 app.UseAuthentication(); // Verify who they are (Firebase JWT)
+app.UseMiddleware<PlatformAccessMiddleware>();
 app.UseAuthorization();  // Verify what they can do (Roles)
 
 app.MapControllers();
