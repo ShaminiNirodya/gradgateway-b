@@ -88,9 +88,12 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("inquiries")]
-    public async Task<IActionResult> GetInquiries([FromQuery] string? status)
+    public async Task<IActionResult> GetInquiries(
+        [FromQuery] string? status,
+        [FromQuery] string? inquiryType,
+        [FromQuery] string? submitterRole)
     {
-        return Ok(await _adminService.GetSupportInquiriesAsync(status));
+        return Ok(await _adminService.GetSupportInquiriesAsync(status, inquiryType, submitterRole));
     }
 
     [HttpPatch("inquiries/{inquiryId:guid}/reviewed")]
@@ -100,6 +103,20 @@ public class AdminController : ControllerBase
         {
             await _adminService.MarkSupportInquiryReviewedAsync(inquiryId);
             return Ok(new { message = "Inquiry marked as reviewed." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("inquiries/{inquiryId:guid}")]
+    public async Task<IActionResult> DeleteInquiry(Guid inquiryId)
+    {
+        try
+        {
+            await _adminService.DeleteSupportInquiryAsync(inquiryId);
+            return Ok(new { message = "Inquiry deleted." });
         }
         catch (InvalidOperationException ex)
         {

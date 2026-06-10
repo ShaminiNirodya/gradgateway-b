@@ -31,7 +31,9 @@ public record AdminUserListItemDto(
     DateTime CreatedAt,
     string? DisplayName,
     Guid? StudentProfileId,
-    Guid? CompanyProfileId
+    Guid? CompanyProfileId,
+    string? StudentUniversity,
+    string? StudentDegree
 );
 
 public record AdminCompanyListItemDto(

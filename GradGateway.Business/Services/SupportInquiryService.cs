@@ -33,6 +33,7 @@ public class SupportInquiryService : ISupportInquiryService
             InquiryType = dto.Type.Trim(),
             Message = dto.Message.Trim(),
             AttachmentName = string.IsNullOrWhiteSpace(dto.AttachmentName) ? null : dto.AttachmentName.Trim(),
+            SubmitterRole = string.IsNullOrWhiteSpace(dto.SubmitterRole) ? null : dto.SubmitterRole.Trim(),
             Status = "Open",
             CreatedAt = DateTime.UtcNow
         };
@@ -52,6 +53,7 @@ public class SupportInquiryService : ISupportInquiryService
             row.InquiryType,
             row.Message,
             row.AttachmentName,
+            row.SubmitterRole,
             row.Status,
             row.CreatedAt,
             row.ReviewedAt);

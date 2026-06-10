@@ -9,8 +9,9 @@ public interface IAdminService
     Task SetUserActiveAsync(Guid userId, bool isActive);
     Task RemoveUserAsync(Guid userId);
     Task<IReadOnlyList<AdminCompanyListItemDto>> GetCompaniesAsync(string? status, string? search);
-    Task<IReadOnlyList<SupportInquiryListItemDto>> GetSupportInquiriesAsync(string? status);
+    Task<IReadOnlyList<SupportInquiryListItemDto>> GetSupportInquiriesAsync(string? status, string? inquiryType, string? submitterRole);
     Task MarkSupportInquiryReviewedAsync(Guid inquiryId);
+    Task DeleteSupportInquiryAsync(Guid inquiryId);
     Task<AdminPlatformSettingsDto> GetPlatformSettingsAsync();
     Task<AdminPlatformSettingsDto> UpdatePlatformSettingsAsync(AdminUpdatePlatformSettingsDto dto);
     Task EnsureAdminAsync(string firebaseUid);

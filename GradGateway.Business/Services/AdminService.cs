@@ -127,7 +127,7 @@ public class AdminService : IAdminService
 
         var students = await _context.StudentProfiles.AsNoTracking()
             .Where(s => userIds.Contains(s.UserId))
-            .Select(s => new { s.UserId, s.Id, s.FullName })
+            .Select(s => new { s.UserId, s.Id, s.FullName, s.University, s.Degree })
             .ToListAsync();
 
         var companies = await _context.CompanyProfiles.AsNoTracking()
@@ -149,7 +149,9 @@ public class AdminService : IAdminService
                 u.CreatedAt,
                 displayName,
                 student?.Id,
-                company?.Id);
+                company?.Id,
+                student?.University,
+                student?.Degree);
         }).ToList();
     }
 
@@ -260,12 +262,25 @@ public class AdminService : IAdminService
         }).ToList();
     }
 
-    public async Task<IReadOnlyList<SupportInquiryListItemDto>> GetSupportInquiriesAsync(string? status)
+    public async Task<IReadOnlyList<SupportInquiryListItemDto>> GetSupportInquiriesAsync(
+        string? status,
+        string? inquiryType,
+        string? submitterRole)
     {
         var query = _context.SupportInquiries.AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(status))
         {
             query = query.Where(i => i.Status == status);
+        }
+
+        if (!string.IsNullOrWhiteSpace(inquiryType))
+        {
+            query = query.Where(i => i.InquiryType == inquiryType);
+        }
+
+        if (!string.IsNullOrWhiteSpace(submitterRole))
+        {
+            query = query.Where(i => i.SubmitterRole == submitterRole);
         }
 
         var rows = await query.OrderByDescending(i => i.CreatedAt).Take(500).ToListAsync();
@@ -279,6 +294,15 @@ public class AdminService : IAdminService
 
         row.Status = "Reviewed";
         row.ReviewedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task DeleteSupportInquiryAsync(Guid inquiryId)
+    {
+        var row = await _context.SupportInquiries.FirstOrDefaultAsync(i => i.Id == inquiryId)
+            ?? throw new InvalidOperationException("Inquiry not found.");
+
+        _context.SupportInquiries.Remove(row);
         await _context.SaveChangesAsync();
     }
 

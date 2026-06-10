@@ -53,10 +53,22 @@ public class PlatformAccessMiddleware
 
         if (!user.IsActive)
         {
+            var isStatusCheck = path.StartsWith("/api/auth/me", StringComparison.OrdinalIgnoreCase);
+            var isSupportRequest =
+                path.StartsWith("/api/supportinquiries", StringComparison.OrdinalIgnoreCase) &&
+                context.Request.Method.Equals("POST", StringComparison.OrdinalIgnoreCase);
+
+            if (isStatusCheck || isSupportRequest)
+            {
+                await _next(context);
+                return;
+            }
+
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             await context.Response.WriteAsJsonAsync(new
             {
-                message = "This account has been removed or suspended. Contact support."
+                message = "Your account has been blocked by an administrator. Contact support if you believe this is a mistake.",
+                code = "ACCOUNT_BLOCKED"
             });
             return;
         }

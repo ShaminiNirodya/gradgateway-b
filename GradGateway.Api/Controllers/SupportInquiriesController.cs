@@ -1,11 +1,12 @@
 using GradGateway.Business.DTOs;
 using GradGateway.Business.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GradGateway.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/supportinquiries")]
 public class SupportInquiriesController : ControllerBase
 {
     private readonly ISupportInquiryService _service;
@@ -16,6 +17,7 @@ public class SupportInquiriesController : ControllerBase
     }
 
     [HttpPost]
+    [AllowAnonymous]
     public async Task<IActionResult> Submit([FromBody] SubmitSupportInquiryDto dto)
     {
         try

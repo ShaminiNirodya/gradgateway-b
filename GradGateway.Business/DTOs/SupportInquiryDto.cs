@@ -6,7 +6,8 @@ public record SubmitSupportInquiryDto(
     string? Phone,
     string Type,
     string Message,
-    string? AttachmentName
+    string? AttachmentName,
+    string? SubmitterRole
 );
 
 public record SupportInquiryListItemDto(
@@ -17,6 +18,7 @@ public record SupportInquiryListItemDto(
     string InquiryType,
     string Message,
     string? AttachmentName,
+    string? SubmitterRole,
     string Status,
     DateTime CreatedAt,
     DateTime? ReviewedAt

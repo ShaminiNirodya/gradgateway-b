@@ -5584,7 +5584,7 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\DELL\\.nuget\\packages\\": {},
+    "C:\\Users\\DELL\\AppData\\Local\\Temp\\cursor-sandbox-cache\\454bf125c721b4e44df53f0201bdc071\\nuget": {},
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
@@ -5593,7 +5593,7 @@
       "projectUniqueName": "D:\\University App\\gradgateway-b\\GradGateway.Api\\GradGateway.Api.csproj",
       "projectName": "GradGateway.Api",
       "projectPath": "D:\\University App\\gradgateway-b\\GradGateway.Api\\GradGateway.Api.csproj",
-      "packagesPath": "C:\\Users\\DELL\\.nuget\\packages\\",
+      "packagesPath": "C:\\Users\\DELL\\AppData\\Local\\Temp\\cursor-sandbox-cache\\454bf125c721b4e44df53f0201bdc071\\nuget",
       "outputPath": "D:\\University App\\gradgateway-b\\GradGateway.Api\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [

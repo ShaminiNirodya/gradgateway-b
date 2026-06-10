@@ -9,6 +9,7 @@ public class SupportInquiry
     public string InquiryType { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
     public string? AttachmentName { get; set; }
+    public string? SubmitterRole { get; set; }
     public string Status { get; set; } = "Open";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ReviewedAt { get; set; }

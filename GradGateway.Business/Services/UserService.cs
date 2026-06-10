@@ -71,7 +71,7 @@ public class UserService : IUserService
             EnsureUserMayAccessPlatform(user, settings);
         }
 
-        return new UserResponseDto(user.Email, user.Role.ToString(), user.FirebaseUid);
+        return MapUserResponse(user);
     }
 
     public async Task<UserResponseDto?> GetUserByFirebaseUidAsync(string firebaseUid)
@@ -83,17 +83,17 @@ public class UserService : IUserService
             return null;
         }
 
-        var settings = await PlatformSettingsAccessor.GetOrCreateAsync(_context);
-        EnsureUserMayAccessPlatform(user, settings);
-
-        return new UserResponseDto(user.Email, user.Role.ToString(), user.FirebaseUid);
+        return MapUserResponse(user);
     }
+
+    private static UserResponseDto MapUserResponse(User user) =>
+        new(user.Email, user.Role.ToString(), user.FirebaseUid, user.IsActive);
 
     private static void EnsureUserMayAccessPlatform(User user, PlatformSettings settings)
     {
         if (!user.IsActive)
         {
-            throw new InvalidOperationException("This account has been suspended. Contact support.");
+            throw new InvalidOperationException("Your account has been blocked by an administrator. Contact support if you believe this is a mistake.");
         }
 
         if (settings.MaintenanceMode && user.Role != UserRole.Admin)
