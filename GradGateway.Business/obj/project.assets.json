@@ -3534,7 +3534,7 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\DELL\\AppData\\Local\\Temp\\cursor-sandbox-cache\\454bf125c721b4e44df53f0201bdc071\\nuget": {},
+    "C:\\Users\\DELL\\.nuget\\packages\\": {},
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
@@ -3543,7 +3543,7 @@
       "projectUniqueName": "D:\\University App\\gradgateway-b\\GradGateway.Business\\GradGateway.Business.csproj",
       "projectName": "GradGateway.Business",
       "projectPath": "D:\\University App\\gradgateway-b\\GradGateway.Business\\GradGateway.Business.csproj",
-      "packagesPath": "C:\\Users\\DELL\\AppData\\Local\\Temp\\cursor-sandbox-cache\\454bf125c721b4e44df53f0201bdc071\\nuget",
+      "packagesPath": "C:\\Users\\DELL\\.nuget\\packages\\",
       "outputPath": "D:\\University App\\gradgateway-b\\GradGateway.Business\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [

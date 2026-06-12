@@ -10,7 +10,7 @@
         "projectUniqueName": "D:\\University App\\gradgateway-b\\GradGateway.Business\\GradGateway.Business.csproj",
         "projectName": "GradGateway.Business",
         "projectPath": "D:\\University App\\gradgateway-b\\GradGateway.Business\\GradGateway.Business.csproj",
-        "packagesPath": "C:\\Users\\DELL\\AppData\\Local\\Temp\\cursor-sandbox-cache\\454bf125c721b4e44df53f0201bdc071\\nuget",
+        "packagesPath": "C:\\Users\\DELL\\.nuget\\packages\\",
         "outputPath": "D:\\University App\\gradgateway-b\\GradGateway.Business\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
@@ -102,7 +102,7 @@
         "projectUniqueName": "D:\\University App\\gradgateway-b\\GradGateway.Data\\GradGateway.Data.csproj",
         "projectName": "GradGateway.Data",
         "projectPath": "D:\\University App\\gradgateway-b\\GradGateway.Data\\GradGateway.Data.csproj",
-        "packagesPath": "C:\\Users\\DELL\\AppData\\Local\\Temp\\cursor-sandbox-cache\\454bf125c721b4e44df53f0201bdc071\\nuget",
+        "packagesPath": "C:\\Users\\DELL\\.nuget\\packages\\",
         "outputPath": "D:\\University App\\gradgateway-b\\GradGateway.Data\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
