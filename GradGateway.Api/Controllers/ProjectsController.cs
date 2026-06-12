@@ -35,6 +35,15 @@ public class ProjectsController : ControllerBase
         }
     }
 
+    /// <summary>Public portfolio view — all projects are visible without authentication.</summary>
+    [HttpGet("{id:guid}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetById(Guid id)
+    {
+        var result = await _service.GetProjectByIdAsync(id);
+        return result == null ? NotFound(new { message = "Project not found" }) : Ok(result);
+    }
+
     [HttpGet("me")]
     public async Task<IActionResult> GetMine()
     {

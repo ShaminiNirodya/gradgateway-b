@@ -6,8 +6,11 @@ namespace GradGateway.Business.Interfaces;
 public interface IApplicationService
 {
     Task<ApplicationResponseDto> ApplyAsync(string firebaseUid, ApplyRequestDto dto);
-    Task<List<ApplicationResponseDto>> GetStudentApplicationsAsync(string firebaseUid);
-    Task<List<ApplicationResponseDto>> GetCompanyApplicationsAsync(string firebaseUid);
+    Task<PagedResultDto<ApplicationResponseDto>> GetStudentApplicationsAsync(
+        string firebaseUid, int page = 1, int pageSize = 50);
+    Task<PagedResultDto<ApplicationResponseDto>> GetCompanyApplicationsAsync(
+        string firebaseUid, int page = 1, int pageSize = 50);
+    Task<CompanyAnalyticsDto> GetCompanyAnalyticsAsync(string firebaseUid);
     Task<ApplicationResponseDto> UpdateStatusAsync(string firebaseUid, Guid applicationId, string status);
     Task<ApplicationResponseDto> CreateJobOfferApplicationAsync(
         string firebaseUid,

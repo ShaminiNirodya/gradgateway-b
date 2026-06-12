@@ -41,12 +41,6 @@ public class AdminService : IAdminService
         var studentAccounts = await _context.Users.CountAsync(u => u.Role == UserRole.Student);
         var companyAccounts = await _context.Users.CountAsync(u => u.Role == UserRole.Company);
         var adminAccounts = await _context.Users.CountAsync(u => u.Role == UserRole.Admin);
-        var pendingCompanies = await _context.CompanyProfiles
-            .CountAsync(c => c.VerificationStatus == CompanyVerificationStatus.Pending);
-        var approvedCompanies = await _context.CompanyProfiles
-            .CountAsync(c => c.VerificationStatus == CompanyVerificationStatus.Approved);
-        var rejectedCompanies = await _context.CompanyProfiles
-            .CountAsync(c => c.VerificationStatus == CompanyVerificationStatus.Rejected);
         var totalApplications = await _context.Applications.CountAsync();
         var hiredApplications = await _context.Applications
             .CountAsync(a => a.Status == ApplicationStatus.Hired);
@@ -69,9 +63,6 @@ public class AdminService : IAdminService
             studentAccounts,
             companyAccounts,
             adminAccounts,
-            pendingCompanies,
-            approvedCompanies,
-            rejectedCompanies,
             totalApplications,
             hiredApplications,
             signups7d,
@@ -81,10 +72,12 @@ public class AdminService : IAdminService
             totalInquiries);
     }
 
-    public async Task<IReadOnlyList<AdminUserListItemDto>> GetUsersAsync(
+    public async Task<PagedResultDto<AdminUserListItemDto>> GetUsersAsync(
         string? role,
         string? search,
-        bool? activeOnly)
+        bool? activeOnly,
+        int page = 1,
+        int pageSize = Pagination.DefaultPageSize)
     {
         var query = _context.Users.AsNoTracking().AsQueryable();
 
@@ -122,7 +115,13 @@ public class AdminService : IAdminService
                 matchingCompanyUserIds.Contains(u.Id));
         }
 
-        users = await query.OrderByDescending(u => u.CreatedAt).Take(500).ToListAsync();
+        var (normalizedPage, normalizedPageSize) = Pagination.Normalize(page, pageSize);
+        var total = await query.CountAsync();
+        users = await query
+            .OrderByDescending(u => u.CreatedAt)
+            .Skip((normalizedPage - 1) * normalizedPageSize)
+            .Take(normalizedPageSize)
+            .ToListAsync();
         var userIds = users.Select(u => u.Id).ToList();
 
         var students = await _context.StudentProfiles.AsNoTracking()
@@ -135,7 +134,7 @@ public class AdminService : IAdminService
             .Select(c => new { c.UserId, c.Id, c.CompanyName })
             .ToListAsync();
 
-        return users.Select(u =>
+        var items = users.Select(u =>
         {
             var student = students.FirstOrDefault(s => s.UserId == u.Id);
             var company = companies.FirstOrDefault(c => c.UserId == u.Id);
@@ -153,6 +152,8 @@ public class AdminService : IAdminService
                 student?.University,
                 student?.Degree);
         }).ToList();
+
+        return new PagedResultDto<AdminUserListItemDto>(items, total, normalizedPage, normalizedPageSize);
     }
 
     public async Task SetUserActiveAsync(Guid userId, bool isActive)
@@ -211,17 +212,24 @@ public class AdminService : IAdminService
         await _context.SaveChangesAsync();
     }
 
-    public async Task<IReadOnlyList<AdminCompanyListItemDto>> GetCompaniesAsync(string? status, string? search)
+    public async Task<PagedResultDto<AdminCompanyListItemDto>> GetCompaniesAsync(
+        string? status,
+        string? search,
+        int page = 1,
+        int pageSize = Pagination.DefaultPageSize)
     {
         var query = _context.CompanyProfiles
             .AsNoTracking()
             .Include(c => c.User)
             .AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(status) &&
-            Enum.TryParse<CompanyVerificationStatus>(status, true, out var parsedStatus))
+        if (string.Equals(status, "active", StringComparison.OrdinalIgnoreCase))
         {
-            query = query.Where(c => c.VerificationStatus == parsedStatus);
+            query = query.Where(c => c.User.IsActive);
+        }
+        else if (string.Equals(status, "blocked", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(c => !c.User.IsActive);
         }
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -233,17 +241,24 @@ public class AdminService : IAdminService
                 c.User.Email.ToLower().Contains(term));
         }
 
-        var companies = await query.OrderByDescending(c => c.CreatedAt).Take(500).ToListAsync();
+        var (normalizedPage, normalizedPageSize) = Pagination.Normalize(page, pageSize);
+        var total = await query.CountAsync();
+        var companies = await query
+            .OrderByDescending(c => c.CreatedAt)
+            .Skip((normalizedPage - 1) * normalizedPageSize)
+            .Take(normalizedPageSize)
+            .ToListAsync();
         var companyIds = companies.Select(c => c.Id).ToList();
         var todaySl = DeadlineClock.TodayDateInSriLanka();
 
         var jobCounts = await _context.Opportunities
+            .AsNoTracking()
             .Where(o => companyIds.Contains(o.CompanyProfileId) && o.IsActive && o.DeadlineAt.Date >= todaySl)
             .GroupBy(o => o.CompanyProfileId)
             .Select(g => new { CompanyProfileId = g.Key, Count = g.Count() })
             .ToListAsync();
 
-        return companies.Select(c =>
+        var items = companies.Select(c =>
         {
             var jobs = jobCounts.FirstOrDefault(j => j.CompanyProfileId == c.Id)?.Count ?? 0;
             return new AdminCompanyListItemDto(
@@ -252,20 +267,21 @@ public class AdminService : IAdminService
                 c.CompanyName,
                 c.CompanyEmail,
                 c.Industry,
-                c.VerificationStatus.ToString(),
-                c.VerificationRejectionReason,
-                c.VerifiedAt,
                 c.CreatedAt,
                 jobs,
                 c.User.Email,
                 c.User.IsActive);
         }).ToList();
+
+        return new PagedResultDto<AdminCompanyListItemDto>(items, total, normalizedPage, normalizedPageSize);
     }
 
-    public async Task<IReadOnlyList<SupportInquiryListItemDto>> GetSupportInquiriesAsync(
+    public async Task<PagedResultDto<SupportInquiryListItemDto>> GetSupportInquiriesAsync(
         string? status,
         string? inquiryType,
-        string? submitterRole)
+        string? submitterRole,
+        int page = 1,
+        int pageSize = Pagination.DefaultPageSize)
     {
         var query = _context.SupportInquiries.AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(status))
@@ -283,8 +299,16 @@ public class AdminService : IAdminService
             query = query.Where(i => i.SubmitterRole == submitterRole);
         }
 
-        var rows = await query.OrderByDescending(i => i.CreatedAt).Take(500).ToListAsync();
-        return rows.Select(SupportInquiryService.ToDto).ToList();
+        var (normalizedPage, normalizedPageSize) = Pagination.Normalize(page, pageSize);
+        var total = await query.CountAsync();
+        var rows = await query
+            .OrderByDescending(i => i.CreatedAt)
+            .Skip((normalizedPage - 1) * normalizedPageSize)
+            .Take(normalizedPageSize)
+            .ToListAsync();
+
+        var items = rows.Select(SupportInquiryService.ToDto).ToList();
+        return new PagedResultDto<SupportInquiryListItemDto>(items, total, normalizedPage, normalizedPageSize);
     }
 
     public async Task MarkSupportInquiryReviewedAsync(Guid inquiryId)
@@ -306,6 +330,55 @@ public class AdminService : IAdminService
         await _context.SaveChangesAsync();
     }
 
+    public async Task<PagedResultDto<AdminEmailLogItemDto>> GetEmailLogsAsync(
+        string? search,
+        string? status,
+        int page = 1,
+        int pageSize = 50)
+    {
+        var query = _context.Set<EmailLog>()
+            .AsNoTracking()
+            .Include(x => x.User)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            query = query.Where(x => x.Status == status);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(x =>
+                x.ToEmail.Contains(term) ||
+                x.User.Email.Contains(term) ||
+                x.TemplateType.Contains(term) ||
+                x.Purpose.Contains(term));
+        }
+
+        var (normalizedPage, normalizedPageSize) = Pagination.Normalize(page, pageSize);
+        var total = await query.CountAsync();
+        var rows = await query
+            .OrderByDescending(x => x.CreatedAt)
+            .Skip((normalizedPage - 1) * normalizedPageSize)
+            .Take(normalizedPageSize)
+            .ToListAsync();
+
+        var items = rows.Select(x => new AdminEmailLogItemDto(
+            x.Id,
+            x.User.Email,
+            x.ToEmail,
+            x.TemplateType,
+            x.Purpose,
+            x.Provider,
+            x.Status,
+            x.Error,
+            x.CreatedAt,
+            x.SentAt)).ToList();
+
+        return new PagedResultDto<AdminEmailLogItemDto>(items, total, normalizedPage, normalizedPageSize);
+    }
+
     public async Task<AdminPlatformSettingsDto> GetPlatformSettingsAsync()
     {
         var settings = await PlatformSettingsAccessor.GetOrCreateAsync(_context);
@@ -316,7 +389,6 @@ public class AdminService : IAdminService
     {
         var settings = await PlatformSettingsAccessor.GetOrCreateAsync(_context);
         settings.AllowRegistration = dto.AllowRegistration;
-        settings.RequireCompanyVerification = dto.RequireCompanyVerification;
         settings.MaintenanceMode = dto.MaintenanceMode;
         settings.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
@@ -326,7 +398,6 @@ public class AdminService : IAdminService
     private static AdminPlatformSettingsDto ToSettingsDto(PlatformSettings settings) =>
         new(
             settings.AllowRegistration,
-            settings.RequireCompanyVerification,
             settings.MaintenanceMode,
             settings.UpdatedAt);
 }

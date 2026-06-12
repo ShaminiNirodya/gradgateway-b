@@ -7,7 +7,10 @@ public record StartConversationRequestDto(
 );
 
 public record SendMessageRequestDto(
-    string Content
+    string Content,
+    string? AttachmentUrl = null,
+    string? AttachmentName = null,
+    string? AttachmentType = null
 );
 
 public record ConversationResponseDto(
@@ -27,5 +30,8 @@ public record MessageResponseDto(
     string SenderName,
     string Content,
     bool IsRead,
-    DateTime SentAt
+    DateTime SentAt,
+    string? AttachmentUrl = null,
+    string? AttachmentName = null,
+    string? AttachmentType = null
 );

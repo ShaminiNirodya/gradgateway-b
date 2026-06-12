@@ -27,9 +27,7 @@ public record CompanyProfileResponseDto(
     string RecruiterName,
     string RecruiterEmail,
     string RecruiterPhone,
-    string Position,
-    string VerificationStatus,
-    string? VerificationRejectionReason
+    string Position
 );
 
 public record CompanyPublicOpeningDto(

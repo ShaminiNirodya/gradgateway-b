@@ -20,6 +20,7 @@ public record StudentRegistrationDto(
 );
 
 public record StudentProfileResponseDto(
+    Guid StudentProfileId,
     string Email,
     string FirebaseUid,
     string FullName,
@@ -36,6 +37,32 @@ public record StudentProfileResponseDto(
     IReadOnlyList<string> Certifications,
     IReadOnlyList<string> Awards,
     string? CvUrl = null
+);
+
+public record StudentSkillDto(
+    Guid Id,
+    string Name,
+    string Category,
+    string ProficiencyLevel
+);
+
+public record AddStudentSkillDto(
+    string Name,
+    string? Category = null,
+    string? ProficiencyLevel = null
+);
+
+public record StudentInterviewDto(
+    Guid Id,
+    DateTime ScheduledAt,
+    string Mode,
+    string? MeetingLink,
+    string? Location,
+    string Status,
+    string? Notes,
+    string JobTitle,
+    string CompanyName,
+    string? CompanyLogoUrl
 );
 
 public record StudentDirectoryItemDto(

@@ -46,9 +46,11 @@ public class AdminController : ControllerBase
     public async Task<IActionResult> GetUsers(
         [FromQuery] string? role,
         [FromQuery] string? search,
-        [FromQuery] bool? activeOnly)
+        [FromQuery] bool? activeOnly,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = Pagination.DefaultPageSize)
     {
-        return Ok(await _adminService.GetUsersAsync(role, search, activeOnly));
+        return Ok(await _adminService.GetUsersAsync(role, search, activeOnly, page, pageSize));
     }
 
     [HttpPatch("users/{userId:guid}/active")]
@@ -82,18 +84,22 @@ public class AdminController : ControllerBase
     [HttpGet("companies")]
     public async Task<IActionResult> GetCompanies(
         [FromQuery] string? status,
-        [FromQuery] string? search)
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = Pagination.DefaultPageSize)
     {
-        return Ok(await _adminService.GetCompaniesAsync(status, search));
+        return Ok(await _adminService.GetCompaniesAsync(status, search, page, pageSize));
     }
 
     [HttpGet("inquiries")]
     public async Task<IActionResult> GetInquiries(
         [FromQuery] string? status,
         [FromQuery] string? inquiryType,
-        [FromQuery] string? submitterRole)
+        [FromQuery] string? submitterRole,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = Pagination.DefaultPageSize)
     {
-        return Ok(await _adminService.GetSupportInquiriesAsync(status, inquiryType, submitterRole));
+        return Ok(await _adminService.GetSupportInquiriesAsync(status, inquiryType, submitterRole, page, pageSize));
     }
 
     [HttpPatch("inquiries/{inquiryId:guid}/reviewed")]
@@ -124,6 +130,16 @@ public class AdminController : ControllerBase
         }
     }
 
+    [HttpGet("email-logs")]
+    public async Task<IActionResult> GetEmailLogs(
+        [FromQuery] string? search,
+        [FromQuery] string? status,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50)
+    {
+        return Ok(await _adminService.GetEmailLogsAsync(search, status, page, pageSize));
+    }
+
     [HttpGet("settings")]
     public async Task<IActionResult> GetSettings()
     {
@@ -134,17 +150,5 @@ public class AdminController : ControllerBase
     public async Task<IActionResult> UpdateSettings([FromBody] AdminUpdatePlatformSettingsDto dto)
     {
         return Ok(await _adminService.UpdatePlatformSettingsAsync(dto));
-    }
-
-    [HttpGet("settings/public")]
-    [AllowAnonymous]
-    public async Task<IActionResult> GetPublicSettings()
-    {
-        var settings = await _adminService.GetPlatformSettingsAsync();
-        return Ok(new
-        {
-            settings.AllowRegistration,
-            settings.MaintenanceMode
-        });
     }
 }

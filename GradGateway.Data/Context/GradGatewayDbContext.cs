@@ -14,7 +14,6 @@ public class GradGatewayDbContext : DbContext
     public DbSet<CompanyProfile> CompanyProfiles { get; set; }
     public DbSet<Opportunity> Opportunities { get; set; }
     public DbSet<Application> Applications { get; set; }
-    public DbSet<SavedOpportunity> SavedOpportunities { get; set; }
     public DbSet<Conversation> Conversations { get; set; }
     public DbSet<Message> Messages { get; set; }
     public DbSet<Notification> Notifications { get; set; }
@@ -26,7 +25,6 @@ public class GradGatewayDbContext : DbContext
     public DbSet<OpportunityInterviewPlan> OpportunityInterviewPlans { get; set; }
     public DbSet<Document> Documents { get; set; }
     public DbSet<EmailLog> EmailLogs { get; set; }
-    public DbSet<CompanyTeamMember> CompanyTeamMembers { get; set; }
     public DbSet<PlatformSettings> PlatformSettings { get; set; }
     public DbSet<SupportInquiry> SupportInquiries { get; set; }
 
@@ -71,9 +69,6 @@ public class GradGatewayDbContext : DbContext
         var applicationId2 = Guid.Parse("eeeeeeee-1111-2222-3333-555555555555");
         var applicationId3 = Guid.Parse("eeeeeeee-1111-2222-3333-666666666666");
 
-        var savedId1 = Guid.Parse("ffffffff-1111-2222-3333-444444444444");
-        var savedId2 = Guid.Parse("ffffffff-1111-2222-3333-555555555555");
-
         var conversationId1 = Guid.Parse("abababab-1111-2222-3333-444444444444");
         var conversationId2 = Guid.Parse("abababab-1111-2222-3333-555555555555");
 
@@ -113,7 +108,6 @@ public class GradGatewayDbContext : DbContext
         {
             Id = platformSettingsId,
             AllowRegistration = true,
-            RequireCompanyVerification = false,
             MaintenanceMode = false,
             UpdatedAt = seedUpdatedAt
         });
@@ -309,28 +303,6 @@ public class GradGatewayDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<CompanyTeamMember>(entity =>
-        {
-            entity.HasIndex(m => new { m.CompanyProfileId, m.Email }).IsUnique();
-            entity.HasIndex(m => m.InvitationToken).IsUnique();
-
-            entity.Property(m => m.Name).HasMaxLength(120);
-            entity.Property(m => m.Email).HasMaxLength(320);
-            entity.Property(m => m.Role).HasMaxLength(80);
-            entity.Property(m => m.Status).HasMaxLength(24);
-            entity.Property(m => m.InvitationToken).HasMaxLength(200);
-
-            entity.HasOne(m => m.CompanyProfile)
-                .WithMany()
-                .HasForeignKey(m => m.CompanyProfileId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(m => m.InvitedByUser)
-                .WithMany()
-                .HasForeignKey(m => m.InvitedByUserId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
         modelBuilder.Entity<CompanyProfile>().HasData(new CompanyProfile
         {
             Id = companyProfileId,
@@ -345,8 +317,6 @@ public class GradGatewayDbContext : DbContext
             RecruiterEmail = "anjana@demotech.lk",
             RecruiterPhone = "+94770111222",
             Position = "HR Manager",
-            VerificationStatus = CompanyVerificationStatus.Approved,
-            VerifiedAt = seedCreatedAt,
             CreatedAt = seedCreatedAt,
             UpdatedAt = seedUpdatedAt
         },
@@ -364,8 +334,6 @@ public class GradGatewayDbContext : DbContext
             RecruiterEmail = "kasun.rodrigo@dialog.lk",
             RecruiterPhone = "+94771239876",
             Position = "Talent Acquisition Executive",
-            VerificationStatus = CompanyVerificationStatus.Approved,
-            VerifiedAt = seedCreatedAt,
             CreatedAt = seedCreatedAt,
             UpdatedAt = seedUpdatedAt
         },
@@ -383,8 +351,6 @@ public class GradGatewayDbContext : DbContext
             RecruiterEmail = "ishara.fernando@wso2.com",
             RecruiterPhone = "+94712340987",
             Position = "Campus Recruiter",
-            VerificationStatus = CompanyVerificationStatus.Approved,
-            VerifiedAt = seedCreatedAt,
             CreatedAt = seedCreatedAt,
             UpdatedAt = seedUpdatedAt
         },
@@ -402,8 +368,6 @@ public class GradGatewayDbContext : DbContext
             RecruiterEmail = "dinithi.abeywickrama@virtusa.com",
             RecruiterPhone = "+94770123456",
             Position = "Associate Manager - Talent",
-            VerificationStatus = CompanyVerificationStatus.Approved,
-            VerifiedAt = seedCreatedAt,
             CreatedAt = seedCreatedAt,
             UpdatedAt = seedUpdatedAt
         });
@@ -438,23 +402,6 @@ public class GradGatewayDbContext : DbContext
             entity.HasOne(p => p.StudentProfile)
                 .WithMany()
                 .HasForeignKey(p => p.StudentProfileId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<SavedOpportunity>(entity =>
-        {
-            entity.HasIndex(p => p.StudentProfileId);
-            entity.HasIndex(p => p.OpportunityId);
-            entity.HasIndex(p => new { p.StudentProfileId, p.OpportunityId }).IsUnique();
-
-            entity.HasOne(p => p.StudentProfile)
-                .WithMany()
-                .HasForeignKey(p => p.StudentProfileId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasOne(p => p.Opportunity)
-                .WithMany()
-                .HasForeignKey(p => p.OpportunityId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -671,23 +618,6 @@ public class GradGatewayDbContext : DbContext
                 Status = ApplicationStatus.Pending,
                 AppliedAt = seedCreatedAt,
                 UpdatedAt = seedUpdatedAt
-            }
-        );
-
-        modelBuilder.Entity<SavedOpportunity>().HasData(
-            new SavedOpportunity
-            {
-                Id = savedId1,
-                StudentProfileId = studentProfileId,
-                OpportunityId = opportunityId2,
-                SavedAt = seedCreatedAt
-            },
-            new SavedOpportunity
-            {
-                Id = savedId2,
-                StudentProfileId = studentProfileId4,
-                OpportunityId = opportunityId4,
-                SavedAt = seedCreatedAt
             }
         );
 

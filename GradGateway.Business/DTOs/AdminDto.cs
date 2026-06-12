@@ -11,9 +11,6 @@ public record AdminDashboardDto(
     int StudentAccounts,
     int CompanyAccounts,
     int AdminAccounts,
-    int PendingCompanyVerifications,
-    int ApprovedCompanies,
-    int RejectedCompanies,
     int TotalApplications,
     int HiredApplications,
     int SignupsLast7Days,
@@ -42,9 +39,6 @@ public record AdminCompanyListItemDto(
     string CompanyName,
     string CompanyEmail,
     string Industry,
-    string VerificationStatus,
-    string? VerificationRejectionReason,
-    DateTime? VerifiedAt,
     DateTime CreatedAt,
     int ActiveJobCount,
     string UserEmail,
@@ -53,20 +47,25 @@ public record AdminCompanyListItemDto(
 
 public record AdminPlatformSettingsDto(
     bool AllowRegistration,
-    bool RequireCompanyVerification,
     bool MaintenanceMode,
     DateTime UpdatedAt
 );
 
 public record AdminUpdatePlatformSettingsDto(
     bool AllowRegistration,
-    bool RequireCompanyVerification,
     bool MaintenanceMode
 );
 
 public record AdminSetUserActiveDto(bool IsActive);
 
-public record AdminSetCompanyVerificationDto(
+public record AdminEmailLogItemDto(
+    Guid Id,
+    string UserEmail,
+    string ToEmail,
+    string TemplateType,
+    string Purpose,
+    string Provider,
     string Status,
-    string? RejectionReason
-);
+    string? Error,
+    DateTime CreatedAt,
+    DateTime? SentAt);

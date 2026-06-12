@@ -110,13 +110,16 @@ public class ApplicationService : IApplicationService
         );
     }
 
-    public async Task<List<ApplicationResponseDto>> GetStudentApplicationsAsync(string firebaseUid)
+    public async Task<PagedResultDto<ApplicationResponseDto>> GetStudentApplicationsAsync(
+        string firebaseUid,
+        int page = 1,
+        int pageSize = 50)
     {
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid);
+        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid);
         if (user == null || user.Role != UserRole.Student)
             throw new InvalidOperationException("Only student users can view this list.");
 
-        var student = await _context.StudentProfiles.FirstOrDefaultAsync(s => s.UserId == user.Id);
+        var student = await _context.StudentProfiles.AsNoTracking().FirstOrDefaultAsync(s => s.UserId == user.Id);
         if (student == null)
             throw new InvalidOperationException("Student profile not found.");
 
@@ -129,19 +132,26 @@ public class ApplicationService : IApplicationService
             // Offer sync from chat is best-effort; still return applications.
         }
 
-        var rows = await _context.Applications
+        var query = _context.Applications
+            .AsNoTracking()
             .Include(a => a.Opportunity)
                 .ThenInclude(o => o!.CompanyProfile)
             .Include(a => a.CompanyProfile)
             .Where(a => a.StudentProfileId == student.Id)
-            .OrderByDescending(a => a.AppliedAt)
+            .OrderByDescending(a => a.AppliedAt);
+
+        var (normalizedPage, normalizedPageSize) = Pagination.Normalize(page, pageSize);
+        var total = await query.CountAsync();
+        var rows = await query
+            .Skip((normalizedPage - 1) * normalizedPageSize)
+            .Take(normalizedPageSize)
             .ToListAsync();
 
-        return rows.Select(a =>
+        var items = rows.Select(a =>
         {
             string jobTitle;
             string companyName;
-            
+
             if (a.Opportunity != null)
             {
                 jobTitle = a.Opportunity.Title;
@@ -165,12 +175,16 @@ public class ApplicationService : IApplicationService
                 a.Status.ToString(),
                 a.AppliedAt,
                 a.UpdatedAt,
-                a.CompanyProfileId
-            );
+                a.CompanyProfileId);
         }).ToList();
+
+        return new PagedResultDto<ApplicationResponseDto>(items, total, normalizedPage, normalizedPageSize);
     }
 
-    public async Task<List<ApplicationResponseDto>> GetCompanyApplicationsAsync(string firebaseUid)
+    public async Task<PagedResultDto<ApplicationResponseDto>> GetCompanyApplicationsAsync(
+        string firebaseUid,
+        int page = 1,
+        int pageSize = 50)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid);
         if (user == null || user.Role != UserRole.Company)
@@ -189,19 +203,26 @@ public class ApplicationService : IApplicationService
             // Offer sync from chat is best-effort; still return applications.
         }
 
-        var rows = await _context.Applications
+        var query = _context.Applications
+            .AsNoTracking()
             .Include(a => a.Opportunity)
             .Include(a => a.StudentProfile)
                 .ThenInclude(s => s.User)
             .Where(a => (a.Opportunity != null && a.Opportunity.CompanyProfileId == company.Id) ||
                        (a.CompanyProfileId == company.Id))
-            .OrderByDescending(a => a.AppliedAt)
+            .OrderByDescending(a => a.AppliedAt);
+
+        var (normalizedPage, normalizedPageSize) = Pagination.Normalize(page, pageSize);
+        var total = await query.CountAsync();
+        var rows = await query
+            .Skip((normalizedPage - 1) * normalizedPageSize)
+            .Take(normalizedPageSize)
             .ToListAsync();
 
-        return rows.Select(a =>
+        var items = rows.Select(a =>
         {
             string jobTitle = a.Opportunity != null ? a.Opportunity.Title : (a.JobTitle ?? "Direct Job Offer");
-            
+
             return new ApplicationResponseDto(
                 a.Id,
                 a.OpportunityId,
@@ -214,9 +235,10 @@ public class ApplicationService : IApplicationService
                 a.Status.ToString(),
                 a.AppliedAt,
                 a.UpdatedAt,
-                a.CompanyProfileId
-            );
+                a.CompanyProfileId);
         }).ToList();
+
+        return new PagedResultDto<ApplicationResponseDto>(items, total, normalizedPage, normalizedPageSize);
     }
 
     public async Task<ApplicationResponseDto> UpdateStatusAsync(string firebaseUid, Guid applicationId, string status)
@@ -1119,7 +1141,10 @@ public class ApplicationService : IApplicationService
                 sender.Email,
                 message.Content,
                 message.IsRead,
-                message.SentAt);
+                message.SentAt,
+                message.AttachmentUrl,
+                message.AttachmentName,
+                message.AttachmentType);
 
             await _realtimeNotification.NotifyNewMessageAsync(recipientUserId, response);
         }
@@ -1127,5 +1152,54 @@ public class ApplicationService : IApplicationService
         {
             // Non-blocking — student can still read the message in inbox.
         }
+    }
+
+    public async Task<CompanyAnalyticsDto> GetCompanyAnalyticsAsync(string firebaseUid)
+    {
+        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid)
+            ?? throw new InvalidOperationException("User not found.");
+        if (user.Role != UserRole.Company)
+            throw new InvalidOperationException("Only company users can view analytics.");
+
+        var company = await _context.CompanyProfiles.AsNoTracking().FirstOrDefaultAsync(c => c.UserId == user.Id)
+            ?? throw new InvalidOperationException("Company profile not found.");
+
+        var rows = await _context.Applications
+            .AsNoTracking()
+            .Where(a =>
+                (a.Opportunity != null && a.Opportunity.CompanyProfileId == company.Id) ||
+                a.CompanyProfileId == company.Id)
+            .Select(a => new { a.Status, a.AppliedAt })
+            .ToListAsync();
+
+        var total = rows.Count;
+        var shortlisted = rows.Count(r => r.Status == ApplicationStatus.Shortlisted);
+        var interviewed = rows.Count(r => r.Status == ApplicationStatus.Interviewed);
+        var offersSent = rows.Count(r => r.Status == ApplicationStatus.OfferSent || r.Status == ApplicationStatus.OfferAccepted);
+        var hired = rows.Count(r => r.Status == ApplicationStatus.Hired);
+
+        var today = DateTime.UtcNow.Date;
+        var byDay = Enumerable.Range(0, 30)
+            .Select(i => today.AddDays(-29 + i))
+            .Select(d => new AnalyticsDataPointDto(
+                d.ToString("MMM d"),
+                rows.Count(r => r.AppliedAt.Date == d),
+                d))
+            .ToList();
+
+        var weekStart = today.AddDays(-((int)today.DayOfWeek + 6) % 7);
+        var byWeek = Enumerable.Range(0, 12)
+            .Select(i => weekStart.AddDays(-7 * (11 - i)))
+            .Select(week =>
+            {
+                var end = week.AddDays(7);
+                return new AnalyticsDataPointDto(
+                    week.ToString("MMM d"),
+                    rows.Count(r => r.AppliedAt.Date >= week && r.AppliedAt.Date < end),
+                    week);
+            })
+            .ToList();
+
+        return new CompanyAnalyticsDto(total, shortlisted, interviewed, offersSent, hired, byDay, byWeek);
     }
 }

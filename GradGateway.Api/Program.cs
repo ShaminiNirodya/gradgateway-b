@@ -16,6 +16,8 @@ using Microsoft.AspNetCore.Authorization;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+builder.Services.AddResponseCaching();
+
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -173,7 +175,6 @@ builder.Services.AddScoped<IDeadlineNotificationProcessor, DeadlineNotificationP
 builder.Services.AddHostedService<GradGateway.Api.Background.DeadlineNotificationBackgroundService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IEmailLogService, EmailLogService>();
-builder.Services.AddScoped<ICompanyTeamService, CompanyTeamService>();
 builder.Services.AddScoped<IPlatformStatsService, PlatformStatsService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<ISupportInquiryService, SupportInquiryService>();
@@ -233,6 +234,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseCors("FrontendPolicy");
+app.UseResponseCaching();
 
 app.UseAuthentication(); // Verify who they are (Firebase JWT)
 app.UseMiddleware<PlatformAccessMiddleware>();

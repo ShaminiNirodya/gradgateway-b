@@ -123,6 +123,7 @@ public class StudentService : IStudentService
         }
 
         return new StudentProfileResponseDto(
+            profile.Id,
             user.Email,
             user.FirebaseUid,
             profile.FullName,
@@ -188,6 +189,7 @@ public class StudentService : IStudentService
         await CleanupLegacyStudentDemoDataAsync(user, profile);
 
         return new StudentProfileResponseDto(
+            profile.Id,
             user.Email,
             user.FirebaseUid,
             profile.FullName,
@@ -421,6 +423,142 @@ public class StudentService : IStudentService
     {
         var rows = await GetStudentDirectoryAsync(null);
         return rows.FirstOrDefault(r => r.StudentProfileId == studentProfileId);
+    }
+
+    public async Task<List<StudentSkillDto>> GetMySkillsAsync(string firebaseUid)
+    {
+        var profile = await GetOwnedStudentProfileAsync(firebaseUid);
+
+        var rows = await _context.StudentSkills
+            .AsNoTracking()
+            .Include(ss => ss.Skill)
+            .Where(ss => ss.StudentProfileId == profile.Id)
+            .OrderBy(ss => ss.Skill.Name)
+            .ToListAsync();
+
+        return rows
+            .Select(ss => new StudentSkillDto(
+                ss.Id,
+                ss.Skill.Name,
+                ss.Skill.Category,
+                ss.ProficiencyLevel.ToString()))
+            .ToList();
+    }
+
+    public async Task<StudentSkillDto> AddSkillAsync(string firebaseUid, AddStudentSkillDto dto)
+    {
+        var profile = await GetOwnedStudentProfileAsync(firebaseUid);
+
+        var name = (dto.Name ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            throw new ArgumentException("Skill name is required.");
+        }
+        if (name.Length > 60)
+        {
+            throw new ArgumentException("Skill name is too long.");
+        }
+
+        var level = SkillLevel.Intermediate;
+        if (!string.IsNullOrWhiteSpace(dto.ProficiencyLevel) &&
+            Enum.TryParse<SkillLevel>(dto.ProficiencyLevel, true, out var parsedLevel))
+        {
+            level = parsedLevel;
+        }
+
+        var skill = await _context.Skills.FirstOrDefaultAsync(s => s.Name.ToLower() == name.ToLower());
+        if (skill == null)
+        {
+            skill = new Skill
+            {
+                Id = Guid.NewGuid(),
+                Name = name,
+                Category = (dto.Category ?? "General").Trim()
+            };
+            _context.Skills.Add(skill);
+        }
+
+        var existing = await _context.StudentSkills
+            .FirstOrDefaultAsync(ss => ss.StudentProfileId == profile.Id && ss.SkillId == skill.Id);
+        if (existing != null)
+        {
+            throw new InvalidOperationException("You already have this skill on your profile.");
+        }
+
+        var studentSkill = new StudentSkill
+        {
+            Id = Guid.NewGuid(),
+            StudentProfileId = profile.Id,
+            SkillId = skill.Id,
+            ProficiencyLevel = level,
+            YearsOfExperience = 0
+        };
+        _context.StudentSkills.Add(studentSkill);
+        await _context.SaveChangesAsync();
+
+        return new StudentSkillDto(studentSkill.Id, skill.Name, skill.Category, level.ToString());
+    }
+
+    public async Task RemoveSkillAsync(string firebaseUid, Guid studentSkillId)
+    {
+        var profile = await GetOwnedStudentProfileAsync(firebaseUid);
+
+        var row = await _context.StudentSkills
+            .FirstOrDefaultAsync(ss => ss.Id == studentSkillId && ss.StudentProfileId == profile.Id);
+        if (row == null)
+        {
+            throw new InvalidOperationException("Skill not found on your profile.");
+        }
+
+        _context.StudentSkills.Remove(row);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<List<StudentInterviewDto>> GetMyInterviewsAsync(string firebaseUid)
+    {
+        var profile = await GetOwnedStudentProfileAsync(firebaseUid);
+
+        var rows = await _context.Interviews
+            .AsNoTracking()
+            .Include(i => i.Application)
+                .ThenInclude(a => a.Opportunity)
+                    .ThenInclude(o => o!.CompanyProfile)
+            .Include(i => i.Application)
+                .ThenInclude(a => a.CompanyProfile)
+            .Where(i => i.Application.StudentProfileId == profile.Id)
+            .OrderBy(i => i.ScheduledAt)
+            .ToListAsync();
+
+        return rows.Select(i =>
+        {
+            var application = i.Application;
+            var company = application.Opportunity?.CompanyProfile ?? application.CompanyProfile;
+            var jobTitle = application.Opportunity?.Title ?? application.JobTitle ?? "Direct offer";
+
+            return new StudentInterviewDto(
+                i.Id,
+                i.ScheduledAt,
+                i.Mode.ToString(),
+                i.MeetingLink,
+                i.Location,
+                i.Status.ToString(),
+                i.Notes,
+                jobTitle,
+                company?.CompanyName ?? "Company",
+                company?.LogoDataUrl);
+        }).ToList();
+    }
+
+    private async Task<StudentProfile> GetOwnedStudentProfileAsync(string firebaseUid)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid);
+        if (user == null || user.Role != UserRole.Student)
+        {
+            throw new InvalidOperationException("Only student users can perform this action.");
+        }
+
+        var profile = await _context.StudentProfiles.FirstOrDefaultAsync(p => p.UserId == user.Id);
+        return profile ?? throw new InvalidOperationException("Student profile not found.");
     }
 
     private async Task EnsureStudentDemoDataAsync(User studentUser, StudentProfile studentProfile)

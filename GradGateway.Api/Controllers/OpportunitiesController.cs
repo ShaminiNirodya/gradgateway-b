@@ -25,9 +25,9 @@ public class OpportunitiesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = Pagination.DefaultPageSize)
     {
-        var feed = await _service.GetStudentOpeningsFeedAsync();
+        var feed = await _service.GetStudentOpeningsFeedAsync(page, pageSize);
         return Ok(feed);
     }
 
@@ -75,14 +75,16 @@ public class OpportunitiesController : ControllerBase
 
     [HttpGet("company/me")]
     [Authorize]
-    public async Task<IActionResult> GetMyCompanyListings()
+    public async Task<IActionResult> GetMyCompanyListings(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = Pagination.DefaultPageSize)
     {
         var uid = GetFirebaseUid();
         if (string.IsNullOrWhiteSpace(uid)) return Unauthorized(new { message = "Invalid token" });
 
         try
         {
-            var data = await _service.GetCompanyOpportunitiesAsync(uid);
+            var data = await _service.GetCompanyOpportunitiesAsync(uid, page, pageSize);
             return Ok(data);
         }
         catch (InvalidOperationException ex)
@@ -106,6 +108,64 @@ public class OpportunitiesController : ControllerBase
         catch (ArgumentException ex)
         {
             return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("{id:guid}")]
+    [Authorize]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateOpportunityRequestDto dto)
+    {
+        var uid = GetFirebaseUid();
+        if (string.IsNullOrWhiteSpace(uid)) return Unauthorized(new { message = "Invalid token" });
+
+        try
+        {
+            var updated = await _service.UpdateOpportunityAsync(uid, id, dto);
+            return Ok(updated);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPatch("{id:guid}/close")]
+    [Authorize]
+    public async Task<IActionResult> Close(Guid id)
+    {
+        var uid = GetFirebaseUid();
+        if (string.IsNullOrWhiteSpace(uid)) return Unauthorized(new { message = "Invalid token" });
+
+        try
+        {
+            var closed = await _service.CloseOpportunityAsync(uid, id);
+            return Ok(closed);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("{id:guid}")]
+    [Authorize]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var uid = GetFirebaseUid();
+        if (string.IsNullOrWhiteSpace(uid)) return Unauthorized(new { message = "Invalid token" });
+
+        try
+        {
+            await _service.DeleteOpportunityAsync(uid, id);
+            return Ok(new { message = "Job post deleted." });
         }
         catch (InvalidOperationException ex)
         {

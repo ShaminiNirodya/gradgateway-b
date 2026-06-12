@@ -87,6 +87,17 @@ public class ProjectService : IProjectService
         return row == null ? null : ToResponse(row, student.FullName);
     }
 
+    public async Task<ProjectResponseDto?> GetProjectByIdAsync(Guid projectId)
+    {
+        var row = await _context.Projects
+            .AsNoTracking()
+            .Include(p => p.Images)
+            .Include(p => p.StudentProfile)
+            .FirstOrDefaultAsync(p => p.Id == projectId);
+
+        return row == null ? null : ToResponse(row, row.StudentProfile?.FullName ?? "GradGateway Student");
+    }
+
     public async Task<ProjectResponseDto> CreateProjectAsync(string firebaseUid, CreateProjectDto dto)
     {
         var student = await GetStudentProfileAsync(firebaseUid);
@@ -100,7 +111,7 @@ public class ProjectService : IProjectService
             TechStack = dto.TechStack,
             RepositoryUrl = dto.RepositoryUrl,
             DemoUrl = dto.DemoUrl,
-            IsPublic = dto.IsPublic,
+            IsPublic = true,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -158,7 +169,7 @@ public class ProjectService : IProjectService
             project.TechStack = dto.TechStack;
             project.RepositoryUrl = dto.RepositoryUrl;
             project.DemoUrl = dto.DemoUrl;
-            project.IsPublic = dto.IsPublic;
+            project.IsPublic = true;
             project.UpdatedAt = DateTime.UtcNow;
 
             // Handle image deletions - delete from DB first

@@ -68,33 +68,44 @@ public class OpportunityService : IOpportunityService
 
     public async Task<List<OpportunityResponseDto>> GetActiveOpportunitiesAsync()
     {
-        var feed = await GetStudentOpeningsFeedAsync();
-        return feed.Active;
+        var feed = await GetStudentOpeningsFeedAsync(page: 1, pageSize: Pagination.MaxPageSize);
+        return feed.Active.Items.ToList();
     }
 
-    public async Task<StudentOpeningsFeedDto> GetStudentOpeningsFeedAsync()
+    public async Task<StudentOpeningsFeedDto> GetStudentOpeningsFeedAsync(int page = 1, int pageSize = Pagination.DefaultPageSize)
     {
         await EnsureDemoOpportunitiesAsync();
         await AutoExpireOpportunitiesAsync();
 
         var todaySl = DeadlineClock.TodayDateInSriLanka();
 
-        var rows = await _context.Opportunities
+        var query = _context.Opportunities
+            .AsNoTracking()
             .Include(o => o.CompanyProfile)
                 .ThenInclude(c => c.User)
             .Where(o =>
                 o.IsActive &&
                 o.DeadlineAt.Date >= todaySl &&
                 o.CompanyProfile.User.IsActive)
-            .OrderByDescending(o => o.CreatedAt)
+            .OrderByDescending(o => o.CreatedAt);
+
+        var (normalizedPage, normalizedPageSize) = Pagination.Normalize(page, pageSize);
+        var total = await query.CountAsync();
+        var rows = await query
+            .Skip((normalizedPage - 1) * normalizedPageSize)
+            .Take(normalizedPageSize)
             .ToListAsync();
 
-        var expiredCount = await _context.Opportunities.CountAsync(o =>
+        var expiredCount = await _context.Opportunities.AsNoTracking().CountAsync(o =>
             !o.IsActive || o.DeadlineAt.Date < todaySl);
 
-        return new StudentOpeningsFeedDto(
+        var active = new PagedResultDto<OpportunityResponseDto>(
             rows.Select(o => ToResponse(o, o.CompanyProfile.CompanyName, o.CompanyProfile.LogoDataUrl)).ToList(),
-            expiredCount);
+            total,
+            normalizedPage,
+            normalizedPageSize);
+
+        return new StudentOpeningsFeedDto(active, expiredCount);
     }
 
     public async Task<int> GetExpiredOpportunitiesCountAsync()
@@ -103,24 +114,35 @@ public class OpportunityService : IOpportunityService
         return feed.ExpiredCount;
     }
 
-    public async Task<List<OpportunityResponseDto>> GetCompanyOpportunitiesAsync(string firebaseUid)
+    public async Task<PagedResultDto<OpportunityResponseDto>> GetCompanyOpportunitiesAsync(
+        string firebaseUid,
+        int page = 1,
+        int pageSize = Pagination.DefaultPageSize)
     {
         await AutoExpireOpportunitiesAsync();
 
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid);
+        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid);
         if (user == null || user.Role != UserRole.Company)
             throw new InvalidOperationException("Only company users can access company opportunities.");
 
-        var company = await _context.CompanyProfiles.FirstOrDefaultAsync(c => c.UserId == user.Id);
+        var company = await _context.CompanyProfiles.AsNoTracking().FirstOrDefaultAsync(c => c.UserId == user.Id);
         if (company == null)
             throw new InvalidOperationException("Company profile not found.");
 
-        var rows = await _context.Opportunities
+        var query = _context.Opportunities
+            .AsNoTracking()
             .Where(o => o.CompanyProfileId == company.Id)
-            .OrderByDescending(o => o.CreatedAt)
+            .OrderByDescending(o => o.CreatedAt);
+
+        var (normalizedPage, normalizedPageSize) = Pagination.Normalize(page, pageSize);
+        var total = await query.CountAsync();
+        var rows = await query
+            .Skip((normalizedPage - 1) * normalizedPageSize)
+            .Take(normalizedPageSize)
             .ToListAsync();
 
-        return rows.Select(o => ToResponse(o, company.CompanyName, company.LogoDataUrl)).ToList();
+        var items = rows.Select(o => ToResponse(o, company.CompanyName, company.LogoDataUrl)).ToList();
+        return new PagedResultDto<OpportunityResponseDto>(items, total, normalizedPage, normalizedPageSize);
     }
 
     public async Task<OpportunityResponseDto?> GetOpportunityByIdAsync(Guid id)
@@ -130,6 +152,96 @@ public class OpportunityService : IOpportunityService
             .FirstOrDefaultAsync(o => o.Id == id);
 
         return row == null ? null : ToResponse(row, row.CompanyProfile.CompanyName, row.CompanyProfile.LogoDataUrl);
+    }
+
+    public async Task<OpportunityResponseDto> UpdateOpportunityAsync(
+        string firebaseUid,
+        Guid opportunityId,
+        UpdateOpportunityRequestDto dto)
+    {
+        var (opportunity, company) = await GetOwnedOpportunityAsync(firebaseUid, opportunityId);
+
+        if (!Enum.TryParse<OpportunityType>(dto.OpportunityType, true, out var type))
+            throw new ArgumentException("Invalid opportunity type.");
+
+        if (!Enum.TryParse<WorkMode>(dto.WorkMode, true, out var mode))
+            throw new ArgumentException("Invalid work mode.");
+
+        var deadlineUtc = DateTime.SpecifyKind(dto.DeadlineAt.Date, DateTimeKind.Utc);
+        if (deadlineUtc.Date < DeadlineClock.TodayDateInSriLanka())
+            throw new ArgumentException("Deadline must be today or a future date.");
+
+        opportunity.Title = dto.Title;
+        opportunity.Description = dto.Description;
+        opportunity.OpportunityType = type;
+        opportunity.WorkMode = mode;
+        opportunity.Location = dto.Location;
+        opportunity.RequiredSkills = dto.RequiredSkills;
+        opportunity.MonthlyStipendLkr = dto.MonthlyStipendLkr;
+        opportunity.DeadlineAt = deadlineUtc;
+        // Extending the deadline of an expired post re-activates it.
+        if (!opportunity.IsActive && deadlineUtc.Date >= DeadlineClock.TodayDateInSriLanka())
+        {
+            opportunity.IsActive = true;
+        }
+        opportunity.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return ToResponse(opportunity, company.CompanyName, company.LogoDataUrl);
+    }
+
+    public async Task<OpportunityResponseDto> CloseOpportunityAsync(string firebaseUid, Guid opportunityId)
+    {
+        var (opportunity, company) = await GetOwnedOpportunityAsync(firebaseUid, opportunityId);
+
+        opportunity.IsActive = false;
+        opportunity.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        return ToResponse(opportunity, company.CompanyName, company.LogoDataUrl);
+    }
+
+    public async Task DeleteOpportunityAsync(string firebaseUid, Guid opportunityId)
+    {
+        var (opportunity, _) = await GetOwnedOpportunityAsync(firebaseUid, opportunityId);
+
+        var hasApplications = await _context.Applications
+            .AnyAsync(a => a.OpportunityId == opportunityId);
+        if (hasApplications)
+        {
+            throw new InvalidOperationException(
+                "This job post has applications and cannot be deleted. Close it instead to preserve applicant history.");
+        }
+
+        var plan = await _context.OpportunityInterviewPlans
+            .FirstOrDefaultAsync(p => p.OpportunityId == opportunityId);
+        if (plan != null)
+        {
+            _context.OpportunityInterviewPlans.Remove(plan);
+        }
+
+        _context.Opportunities.Remove(opportunity);
+        await _context.SaveChangesAsync();
+    }
+
+    private async Task<(Opportunity Opportunity, CompanyProfile Company)> GetOwnedOpportunityAsync(
+        string firebaseUid,
+        Guid opportunityId)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid);
+        if (user == null || user.Role != UserRole.Company)
+            throw new InvalidOperationException("Only company users can manage opportunities.");
+
+        var company = await _context.CompanyProfiles.FirstOrDefaultAsync(c => c.UserId == user.Id);
+        if (company == null)
+            throw new InvalidOperationException("Company profile not found.");
+
+        var opportunity = await _context.Opportunities
+            .FirstOrDefaultAsync(o => o.Id == opportunityId && o.CompanyProfileId == company.Id);
+        if (opportunity == null)
+            throw new InvalidOperationException("Opportunity not found or you don't have access to it.");
+
+        return (opportunity, company);
     }
 
     private static OpportunityResponseDto ToResponse(Opportunity o, string companyName, string? companyLogoUrl = null)

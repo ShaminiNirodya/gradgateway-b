@@ -147,6 +147,74 @@ public class StudentsController : ControllerBase
         }
     }
 
+    [HttpGet("me/skills")]
+    [Authorize]
+    public async Task<IActionResult> GetMySkills()
+    {
+        var firebaseUid = GetFirebaseUid();
+        if (string.IsNullOrWhiteSpace(firebaseUid))
+        {
+            return Unauthorized(new { message = "Invalid token: Firebase UID not found" });
+        }
+
+        try
+        {
+            return Ok(await _studentService.GetMySkillsAsync(firebaseUid));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("me/skills")]
+    [Authorize]
+    public async Task<IActionResult> AddMySkill([FromBody] AddStudentSkillDto dto)
+    {
+        var firebaseUid = GetFirebaseUid();
+        if (string.IsNullOrWhiteSpace(firebaseUid))
+        {
+            return Unauthorized(new { message = "Invalid token: Firebase UID not found" });
+        }
+
+        try
+        {
+            return Ok(await _studentService.AddSkillAsync(firebaseUid, dto));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("me/skills/{studentSkillId:guid}")]
+    [Authorize]
+    public async Task<IActionResult> RemoveMySkill(Guid studentSkillId)
+    {
+        var firebaseUid = GetFirebaseUid();
+        if (string.IsNullOrWhiteSpace(firebaseUid))
+        {
+            return Unauthorized(new { message = "Invalid token: Firebase UID not found" });
+        }
+
+        try
+        {
+            await _studentService.RemoveSkillAsync(firebaseUid, studentSkillId);
+            return Ok(new { message = "Skill removed." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    private string? GetFirebaseUid()
+        => User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("user_id")?.Value;
+
     [HttpGet("directory")]
     [Authorize]
     public async Task<IActionResult> GetStudentDirectory([FromQuery] string? q = null)

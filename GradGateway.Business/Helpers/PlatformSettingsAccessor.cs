@@ -20,7 +20,6 @@ public static class PlatformSettingsAccessor
         {
             Id = SingletonId,
             AllowRegistration = true,
-            RequireCompanyVerification = true,
             MaintenanceMode = false,
             UpdatedAt = DateTime.UtcNow
         };

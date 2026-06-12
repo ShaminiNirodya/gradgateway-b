@@ -235,65 +235,6 @@ namespace GradGateway.Data.Migrations
                         });
                 });
 
-            modelBuilder.Entity("GradGateway.Data.Entities.CompanyTeamMember", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime?>("AcceptedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid>("CompanyProfileId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(320)
-                        .HasColumnType("nvarchar(320)");
-
-                    b.Property<DateTime>("InvitationExpiresAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("InvitationToken")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTime>("InvitedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid>("InvitedByUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("nvarchar(120)");
-
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("nvarchar(80)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(24)
-                        .HasColumnType("nvarchar(24)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("InvitationToken")
-                        .IsUnique();
-
-                    b.HasIndex("InvitedByUserId");
-
-                    b.HasIndex("CompanyProfileId", "Email")
-                        .IsUnique();
-
-                    b.ToTable("CompanyTeamMembers");
-                });
-
             modelBuilder.Entity("GradGateway.Data.Entities.Conversation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -547,6 +488,15 @@ namespace GradGateway.Data.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AttachmentName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("AttachmentType")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("AttachmentUrl")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Content")
                         .IsRequired()
@@ -1006,47 +956,79 @@ namespace GradGateway.Data.Migrations
                     b.ToTable("ProjectImages");
                 });
 
-            modelBuilder.Entity("GradGateway.Data.Entities.SavedOpportunity", b =>
+            modelBuilder.Entity("GradGateway.Data.Entities.PlatformSettings", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("OpportunityId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<bool>("AllowRegistration")
+                        .HasColumnType("bit");
 
-                    b.Property<DateTime>("SavedAt")
+                    b.Property<bool>("MaintenanceMode")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<Guid>("StudentProfileId")
-                        .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OpportunityId");
-
-                    b.HasIndex("StudentProfileId");
-
-                    b.HasIndex("StudentProfileId", "OpportunityId")
-                        .IsUnique();
-
-                    b.ToTable("SavedOpportunities");
+                    b.ToTable("PlatformSettings");
 
                     b.HasData(
                         new
                         {
-                            Id = new Guid("ffffffff-1111-2222-3333-444444444444"),
-                            OpportunityId = new Guid("dddddddd-1111-2222-3333-555555555555"),
-                            SavedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            StudentProfileId = new Guid("bbbbbbbb-1111-2222-3333-444444444444")
-                        },
-                        new
-                        {
-                            Id = new Guid("ffffffff-1111-2222-3333-555555555555"),
-                            OpportunityId = new Guid("dddddddd-1111-2222-3333-777777777777"),
-                            SavedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            StudentProfileId = new Guid("bbbbbbbb-1111-2222-3333-777777777777")
+                            Id = new Guid("f0f0f0f0-1111-2222-3333-444444444444"),
+                            AllowRegistration = true,
+                            MaintenanceMode = false,
+                            UpdatedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         });
+                });
+
+            modelBuilder.Entity("GradGateway.Data.Entities.SupportInquiry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AttachmentName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("InquiryType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Phone")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SubmitterRole")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SupportInquiries");
                 });
 
             modelBuilder.Entity("GradGateway.Data.Entities.Skill", b =>
@@ -1458,25 +1440,6 @@ namespace GradGateway.Data.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("GradGateway.Data.Entities.CompanyTeamMember", b =>
-                {
-                    b.HasOne("GradGateway.Data.Entities.CompanyProfile", "CompanyProfile")
-                        .WithMany()
-                        .HasForeignKey("CompanyProfileId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("GradGateway.Data.Entities.User", "InvitedByUser")
-                        .WithMany()
-                        .HasForeignKey("InvitedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("CompanyProfile");
-
-                    b.Navigation("InvitedByUser");
-                });
-
             modelBuilder.Entity("GradGateway.Data.Entities.Conversation", b =>
                 {
                     b.HasOne("GradGateway.Data.Entities.CompanyProfile", "CompanyProfile")
@@ -1619,25 +1582,6 @@ namespace GradGateway.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Project");
-                });
-
-            modelBuilder.Entity("GradGateway.Data.Entities.SavedOpportunity", b =>
-                {
-                    b.HasOne("GradGateway.Data.Entities.Opportunity", "Opportunity")
-                        .WithMany()
-                        .HasForeignKey("OpportunityId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("GradGateway.Data.Entities.StudentProfile", "StudentProfile")
-                        .WithMany()
-                        .HasForeignKey("StudentProfileId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Opportunity");
-
-                    b.Navigation("StudentProfile");
                 });
 
             modelBuilder.Entity("GradGateway.Data.Entities.StudentProfile", b =>

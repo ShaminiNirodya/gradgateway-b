@@ -284,13 +284,17 @@ public class ConversationService : IConversationService
             m.SenderUser.Email,
             m.Content,
             m.IsRead,
-            m.SentAt
+            m.SentAt,
+            m.AttachmentUrl,
+            m.AttachmentName,
+            m.AttachmentType
         )).ToList();
     }
 
     public async Task<MessageResponseDto> SendMessageAsync(string firebaseUid, Guid conversationId, SendMessageRequestDto dto)
     {
-        if (string.IsNullOrWhiteSpace(dto.Content))
+        var hasAttachment = !string.IsNullOrWhiteSpace(dto.AttachmentUrl);
+        if (string.IsNullOrWhiteSpace(dto.Content) && !hasAttachment)
             throw new ArgumentException("Message content is required.");
 
         var user = await _context.Users.FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid)
@@ -311,7 +315,10 @@ public class ConversationService : IConversationService
             Id = Guid.NewGuid(),
             ConversationId = conversationId,
             SenderUserId = user.Id,
-            Content = dto.Content.Trim(),
+            Content = (dto.Content ?? string.Empty).Trim(),
+            AttachmentUrl = hasAttachment ? dto.AttachmentUrl!.Trim() : null,
+            AttachmentName = hasAttachment ? dto.AttachmentName?.Trim() : null,
+            AttachmentType = hasAttachment ? dto.AttachmentType?.Trim() : null,
             IsRead = false,
             SentAt = DateTime.UtcNow
         };
@@ -374,7 +381,10 @@ public class ConversationService : IConversationService
             user.Email,
             msg.Content,
             msg.IsRead,
-            msg.SentAt
+            msg.SentAt,
+            msg.AttachmentUrl,
+            msg.AttachmentName,
+            msg.AttachmentType
         );
 
         // Send real-time notification via SignalR

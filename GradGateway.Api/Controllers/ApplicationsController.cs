@@ -41,14 +41,14 @@ public class ApplicationsController : ControllerBase
     }
 
     [HttpGet("student/me")]
-    public async Task<IActionResult> GetStudentMine()
+    public async Task<IActionResult> GetStudentMine([FromQuery] int page = 1, [FromQuery] int pageSize = 50)
     {
         var uid = GetFirebaseUid();
         if (string.IsNullOrWhiteSpace(uid)) return Unauthorized(new { message = "Invalid token" });
 
         try
         {
-            var result = await _service.GetStudentApplicationsAsync(uid);
+            var result = await _service.GetStudentApplicationsAsync(uid, page, pageSize);
             return Ok(result);
         }
         catch (InvalidOperationException ex)
@@ -75,15 +75,31 @@ public class ApplicationsController : ControllerBase
     }
 
     [HttpGet("company/me")]
-    public async Task<IActionResult> GetCompanyMine()
+    public async Task<IActionResult> GetCompanyMine([FromQuery] int page = 1, [FromQuery] int pageSize = 50)
     {
         var uid = GetFirebaseUid();
         if (string.IsNullOrWhiteSpace(uid)) return Unauthorized(new { message = "Invalid token" });
 
         try
         {
-            var result = await _service.GetCompanyApplicationsAsync(uid);
+            var result = await _service.GetCompanyApplicationsAsync(uid, page, pageSize);
             return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("company/analytics")]
+    public async Task<IActionResult> GetCompanyAnalytics()
+    {
+        var uid = GetFirebaseUid();
+        if (string.IsNullOrWhiteSpace(uid)) return Unauthorized(new { message = "Invalid token" });
+
+        try
+        {
+            return Ok(await _service.GetCompanyAnalyticsAsync(uid));
         }
         catch (InvalidOperationException ex)
         {

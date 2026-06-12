@@ -56,8 +56,6 @@ public class CompanyService : ICompanyService
                 RecruiterEmail = dto.RecruiterEmail,
                 RecruiterPhone = dto.RecruiterPhone,
                 Position = dto.Position,
-                VerificationStatus = CompanyVerificationStatus.Approved,
-                VerifiedAt = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -147,7 +145,5 @@ public class CompanyService : ICompanyService
             profile.RecruiterName,
             profile.RecruiterEmail,
             profile.RecruiterPhone,
-            profile.Position,
-            profile.VerificationStatus.ToString(),
-            profile.VerificationRejectionReason);
+            profile.Position);
 }

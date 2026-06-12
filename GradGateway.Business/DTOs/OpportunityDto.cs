@@ -11,8 +11,19 @@ public record CreateOpportunityRequestDto(
     DateTime DeadlineAt
 );
 
+public record UpdateOpportunityRequestDto(
+    string Title,
+    string Description,
+    string OpportunityType,
+    string WorkMode,
+    string Location,
+    string RequiredSkills,
+    decimal? MonthlyStipendLkr,
+    DateTime DeadlineAt
+);
+
 public record StudentOpeningsFeedDto(
-    List<OpportunityResponseDto> Active,
+    PagedResultDto<OpportunityResponseDto> Active,
     int ExpiredCount
 );
 
