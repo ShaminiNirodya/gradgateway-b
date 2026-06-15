@@ -13,17 +13,20 @@ public class AdminController : ControllerBase
 {
     private readonly IAdminService _adminService;
     private readonly ITestimonialService _testimonialService;
+    private readonly IPlatformContentService _platformContentService;
     private readonly ILogger<AdminController> _logger;
     private readonly IHostEnvironment _environment;
 
     public AdminController(
         IAdminService adminService,
         ITestimonialService testimonialService,
+        IPlatformContentService platformContentService,
         ILogger<AdminController> logger,
         IHostEnvironment environment)
     {
         _adminService = adminService;
         _testimonialService = testimonialService;
+        _platformContentService = platformContentService;
         _logger = logger;
         _environment = environment;
     }
@@ -195,20 +198,10 @@ public class AdminController : ControllerBase
     }
 
     [HttpPut("testimonials/{testimonialId:guid}")]
-    public async Task<IActionResult> UpdateTestimonial(Guid testimonialId, [FromBody] AdminUpdateTestimonialDto dto)
+    public Task<IActionResult> UpdateTestimonial(Guid testimonialId, [FromBody] AdminUpdateTestimonialDto dto)
     {
-        try
-        {
-            return Ok(await _testimonialService.UpdateAsync(testimonialId, dto));
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        return Task.FromResult<IActionResult>(
+            StatusCode(StatusCodes.Status403Forbidden, new { message = "Testimonials cannot be edited after submission." }));
     }
 
     [HttpPatch("testimonials/{testimonialId:guid}/status")]
@@ -237,6 +230,59 @@ public class AdminController : ControllerBase
         {
             await _testimonialService.DeleteAsync(testimonialId);
             return Ok(new { message = "Testimonial deleted." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("content")]
+    public async Task<IActionResult> GetContent(
+        [FromQuery] string? contentType,
+        [FromQuery] string? section,
+        [FromQuery] string? status)
+    {
+        return Ok(await _platformContentService.GetAdminListAsync(contentType, section, status));
+    }
+
+    [HttpPost("content")]
+    public async Task<IActionResult> CreateContent([FromBody] AdminCreatePlatformContentDto dto)
+    {
+        try
+        {
+            return Ok(await _platformContentService.CreateAsync(dto));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("content/{contentId:guid}")]
+    public async Task<IActionResult> UpdateContent(Guid contentId, [FromBody] AdminUpdatePlatformContentDto dto)
+    {
+        try
+        {
+            return Ok(await _platformContentService.UpdateAsync(contentId, dto));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("content/{contentId:guid}")]
+    public async Task<IActionResult> DeleteContent(Guid contentId)
+    {
+        try
+        {
+            await _platformContentService.DeleteAsync(contentId);
+            return Ok(new { message = "Content deleted." });
         }
         catch (InvalidOperationException ex)
         {

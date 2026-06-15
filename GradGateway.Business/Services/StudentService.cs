@@ -78,6 +78,7 @@ public class StudentService : IStudentService
                 Availability = dto.Availability ?? "Available Now",
                 CertificationsJson = SerializeStringList(dto.Certifications),
                 AwardsJson = SerializeStringList(dto.Awards),
+                HackathonsCompetitionsJson = SerializeStringList(dto.HackathonsCompetitions),
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -110,6 +111,10 @@ public class StudentService : IStudentService
             {
                 profile.AwardsJson = SerializeStringList(dto.Awards);
             }
+            if (dto.HackathonsCompetitions != null)
+            {
+                profile.HackathonsCompetitionsJson = SerializeStringList(dto.HackathonsCompetitions);
+            }
             profile.UpdatedAt = DateTime.UtcNow;
         }
 
@@ -139,6 +144,7 @@ public class StudentService : IStudentService
             profile.Availability,
             DeserializeStringList(profile.CertificationsJson),
             DeserializeStringList(profile.AwardsJson),
+            DeserializeStringList(profile.HackathonsCompetitionsJson),
             profile.CvUrl
         );
     }
@@ -205,6 +211,7 @@ public class StudentService : IStudentService
             profile.Availability,
             DeserializeStringList(profile.CertificationsJson),
             DeserializeStringList(profile.AwardsJson),
+            DeserializeStringList(profile.HackathonsCompetitionsJson),
             profile.CvUrl
         );
     }

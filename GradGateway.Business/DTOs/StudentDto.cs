@@ -16,6 +16,7 @@ public record StudentRegistrationDto(
     string? Availability = "Available Now",
     IReadOnlyList<string>? Certifications = null,
     IReadOnlyList<string>? Awards = null,
+    IReadOnlyList<string>? HackathonsCompetitions = null,
     string? CvUrl = null
 );
 
@@ -36,6 +37,7 @@ public record StudentProfileResponseDto(
     string Availability,
     IReadOnlyList<string> Certifications,
     IReadOnlyList<string> Awards,
+    IReadOnlyList<string> HackathonsCompetitions,
     string? CvUrl = null
 );
 

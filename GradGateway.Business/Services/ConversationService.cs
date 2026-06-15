@@ -160,6 +160,11 @@ public class ConversationService : IConversationService
             return [];
         }
 
+        if (user.Role == UserRole.Admin)
+        {
+            rows = await CollapseAdminSupportDuplicatesAsync(rows);
+        }
+
         var conversationIds = rows.Select(r => r.Id).ToList();
         var lastMessages = await _context.Messages
             .Where(m => conversationIds.Contains(m.ConversationId))
@@ -375,6 +380,69 @@ public class ConversationService : IConversationService
         return response;
     }
 
+    public async Task DeleteConversationAsync(string firebaseUid, Guid conversationId)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid)
+                   ?? throw new InvalidOperationException("User not found.");
+
+        if (user.Role is not (UserRole.Student or UserRole.Company))
+        {
+            throw new InvalidOperationException("Only students and companies can delete chats.");
+        }
+
+        var convo = await _context.Conversations
+            .Include(c => c.StudentProfile)
+            .Include(c => c.CompanyProfile)
+            .FirstOrDefaultAsync(c => c.Id == conversationId)
+            ?? throw new ArgumentException("Conversation not found.");
+
+        if (!await IsParticipant(user, convo))
+        {
+            throw new InvalidOperationException("You are not allowed to delete this conversation.");
+        }
+
+        List<Guid> threadIds;
+
+        if (convo.Kind == ConversationKinds.StudentCompany)
+        {
+            if (convo.StudentProfileId == null || convo.CompanyProfileId == null)
+            {
+                throw new InvalidOperationException("Invalid conversation.");
+            }
+
+            threadIds = await _context.Conversations
+                .Where(c => c.Kind == ConversationKinds.StudentCompany
+                            && c.StudentProfileId == convo.StudentProfileId
+                            && c.CompanyProfileId == convo.CompanyProfileId)
+                .Select(c => c.Id)
+                .ToListAsync();
+        }
+        else if (convo.Kind == ConversationKinds.AdminSupport)
+        {
+            threadIds = [conversationId];
+        }
+        else
+        {
+            throw new InvalidOperationException("This conversation cannot be deleted.");
+        }
+
+        var relatedNotifications = await _context.Notifications
+            .Where(n => n.RelatedConversationId != null && threadIds.Contains(n.RelatedConversationId.Value))
+            .ToListAsync();
+
+        if (relatedNotifications.Count > 0)
+        {
+            _context.Notifications.RemoveRange(relatedNotifications);
+        }
+
+        var conversationsToDelete = await _context.Conversations
+            .Where(c => threadIds.Contains(c.Id))
+            .ToListAsync();
+
+        _context.Conversations.RemoveRange(conversationsToDelete);
+        await _context.SaveChangesAsync();
+    }
+
     private async Task<ConversationResponseDto> StartAdminSupportConversationAsync(User admin, StartConversationRequestDto dto)
     {
         if (dto.StudentProfileId != null && dto.CompanyProfileId != null)
@@ -415,23 +483,34 @@ public class ConversationService : IConversationService
             supportTargetRole = "Company";
         }
 
-        var existing = await _context.Conversations
-            .FirstOrDefaultAsync(c => c.Kind == ConversationKinds.AdminSupport
-                                   && c.SupportTargetUserId == supportTargetUserId);
+        var existingRows = await _context.Conversations
+            .Where(c => c.Kind == ConversationKinds.AdminSupport
+                     && c.SupportTargetUserId == supportTargetUserId)
+            .OrderByDescending(c => c.LastMessageAt)
+            .ToListAsync();
 
-        var convo = existing ?? new Conversation
+        Conversation convo;
+        if (existingRows.Count == 0)
         {
-            Id = Guid.NewGuid(),
-            Kind = ConversationKinds.AdminSupport,
-            SupportTargetUserId = supportTargetUserId,
-            CreatedAt = DateTime.UtcNow,
-            LastMessageAt = DateTime.UtcNow
-        };
-
-        if (existing == null)
-        {
+            convo = new Conversation
+            {
+                Id = Guid.NewGuid(),
+                Kind = ConversationKinds.AdminSupport,
+                SupportTargetUserId = supportTargetUserId,
+                CreatedAt = DateTime.UtcNow,
+                LastMessageAt = DateTime.UtcNow
+            };
             _context.Conversations.Add(convo);
             await _context.SaveChangesAsync();
+        }
+        else
+        {
+            convo = existingRows[0];
+            if (existingRows.Count > 1)
+            {
+                await MergeAdminSupportDuplicatesAsync(existingRows);
+                convo = existingRows[0];
+            }
         }
 
         return new ConversationResponseDto(
@@ -810,6 +889,79 @@ public class ConversationService : IConversationService
         {
             await _context.SaveChangesAsync();
         }
+    }
+
+    private async Task<List<Conversation>> CollapseAdminSupportDuplicatesAsync(List<Conversation> rows)
+    {
+        var adminRows = rows.Where(c => c.Kind == ConversationKinds.AdminSupport).ToList();
+        if (adminRows.Count <= 1)
+        {
+            return rows;
+        }
+
+        var grouped = adminRows
+            .Where(c => c.SupportTargetUserId != null)
+            .GroupBy(c => c.SupportTargetUserId!.Value)
+            .Where(g => g.Count() > 1)
+            .ToList();
+
+        if (grouped.Count == 0)
+        {
+            return rows;
+        }
+
+        foreach (var group in grouped)
+        {
+            var ordered = group.OrderByDescending(c => c.LastMessageAt).ToList();
+            await MergeAdminSupportDuplicatesAsync(ordered);
+        }
+
+        var duplicateIds = grouped
+            .SelectMany(g => g.OrderByDescending(c => c.LastMessageAt).Skip(1).Select(c => c.Id))
+            .ToHashSet();
+
+        return rows.Where(c => !duplicateIds.Contains(c.Id)).ToList();
+    }
+
+    private async Task MergeAdminSupportDuplicatesAsync(List<Conversation> orderedByRecency)
+    {
+        if (orderedByRecency.Count <= 1)
+        {
+            return;
+        }
+
+        var primary = orderedByRecency[0];
+        var duplicateIds = orderedByRecency.Skip(1).Select(c => c.Id).ToList();
+
+        var messagesToMove = await _context.Messages
+            .Where(m => duplicateIds.Contains(m.ConversationId))
+            .ToListAsync();
+
+        foreach (var message in messagesToMove)
+        {
+            message.ConversationId = primary.Id;
+        }
+
+        var notificationsToMove = await _context.Notifications
+            .Where(n => n.RelatedConversationId != null && duplicateIds.Contains(n.RelatedConversationId.Value))
+            .ToListAsync();
+
+        foreach (var notification in notificationsToMove)
+        {
+            notification.RelatedConversationId = primary.Id;
+        }
+
+        var duplicates = await _context.Conversations
+            .Where(c => duplicateIds.Contains(c.Id))
+            .ToListAsync();
+
+        if (messagesToMove.Count > 0)
+        {
+            primary.LastMessageAt = messagesToMove.Max(m => m.SentAt);
+        }
+
+        _context.Conversations.RemoveRange(duplicates);
+        await _context.SaveChangesAsync();
     }
 
     private async Task<bool> IsParticipant(User user, Conversation convo)

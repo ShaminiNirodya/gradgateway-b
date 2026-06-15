@@ -22,6 +22,7 @@ public class StudentProfile
     public string Availability { get; set; } = "Available Now"; // Available Now, Actively Looking, Open to Offers, Not Looking
     public string? CertificationsJson { get; set; }
     public string? AwardsJson { get; set; }
+    public string? HackathonsCompetitionsJson { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

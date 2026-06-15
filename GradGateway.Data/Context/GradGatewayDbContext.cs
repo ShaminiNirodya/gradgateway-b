@@ -28,6 +28,7 @@ public class GradGatewayDbContext : DbContext
     public DbSet<PlatformSettings> PlatformSettings { get; set; }
     public DbSet<SupportInquiry> SupportInquiries { get; set; }
     public DbSet<Testimonial> Testimonials { get; set; }
+    public DbSet<PlatformContent> PlatformContents { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -528,6 +529,21 @@ public class GradGatewayDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(p => p.StudentProfileId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PlatformContent>(entity =>
+        {
+            entity.Property(e => e.ContentType).HasMaxLength(20);
+            entity.Property(e => e.Section).HasMaxLength(20);
+            entity.Property(e => e.Title).HasMaxLength(300);
+            entity.Property(e => e.Audiences).HasMaxLength(100);
+            entity.Property(e => e.Category).HasMaxLength(120);
+            entity.Property(e => e.Slug).HasMaxLength(120);
+            entity.Property(e => e.Status).HasMaxLength(20);
+            entity.Property(e => e.RelatedLinkHref).HasMaxLength(500);
+            entity.Property(e => e.RelatedLinkLabel).HasMaxLength(200);
+            entity.HasIndex(e => new { e.ContentType, e.Section, e.Status });
+            entity.HasIndex(e => e.SortOrder);
         });
 
         modelBuilder.Entity<Opportunity>().HasData(

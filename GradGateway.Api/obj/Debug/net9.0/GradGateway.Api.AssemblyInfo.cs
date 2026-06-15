@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("GradGateway.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+43e741abbf9049d56a30e14e0c01fbe0adcae8ac")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3a0ce299fcf1b3c2e3976fa5a724f3248c988687")]
 [assembly: System.Reflection.AssemblyProductAttribute("GradGateway.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("GradGateway.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

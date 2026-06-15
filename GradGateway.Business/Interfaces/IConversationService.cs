@@ -8,4 +8,5 @@ public interface IConversationService
     Task<List<ConversationResponseDto>> GetMyConversationsAsync(string firebaseUid);
     Task<List<MessageResponseDto>> GetMessagesAsync(string firebaseUid, Guid conversationId);
     Task<MessageResponseDto> SendMessageAsync(string firebaseUid, Guid conversationId, SendMessageRequestDto dto);
+    Task DeleteConversationAsync(string firebaseUid, Guid conversationId);
 }
