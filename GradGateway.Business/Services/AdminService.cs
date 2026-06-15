@@ -51,6 +51,7 @@ public class AdminService : IAdminService
             !o.IsActive || o.DeadlineAt.Date < todaySl);
         var openInquiries = await _context.SupportInquiries.CountAsync(i => i.Status == "Open");
         var totalInquiries = await _context.SupportInquiries.CountAsync();
+        var pendingTestimonials = await _context.Testimonials.CountAsync(t => t.Status == "Pending");
 
         return new AdminDashboardDto(
             stats.TotalStudents,
@@ -69,7 +70,85 @@ public class AdminService : IAdminService
             activeJobs,
             expiredJobs,
             openInquiries,
-            totalInquiries);
+            totalInquiries,
+            pendingTestimonials);
+    }
+
+    public async Task<AdminAnalyticsDto> GetAnalyticsAsync()
+    {
+        var dashboard = await GetDashboardAsync();
+        var stats = await _platformStats.GetPlatformStatsAsync();
+        var today = DateTime.UtcNow.Date;
+        var sevenDaysAgo = today.AddDays(-7);
+
+        var userRows = await _context.Users
+            .AsNoTracking()
+            .Select(u => new { u.CreatedAt })
+            .ToListAsync();
+
+        var signupsByWeek = Enumerable.Range(0, 8)
+            .Select(i => today.AddDays(-7 * (7 - i)))
+            .Select(weekStart =>
+            {
+                var weekEnd = weekStart.AddDays(7);
+                return new AnalyticsDataPointDto(
+                    weekStart.ToString("MMM d"),
+                    userRows.Count(u => u.CreatedAt.Date >= weekStart && u.CreatedAt.Date < weekEnd),
+                    weekStart);
+            })
+            .ToList();
+
+        var applicationRows = await _context.Applications
+            .AsNoTracking()
+            .Select(a => new { a.Status, a.AppliedAt })
+            .ToListAsync();
+
+        var applicationsByWeek = Enumerable.Range(0, 8)
+            .Select(i => today.AddDays(-7 * (7 - i)))
+            .Select(weekStart =>
+            {
+                var weekEnd = weekStart.AddDays(7);
+                return new AnalyticsDataPointDto(
+                    weekStart.ToString("MMM d"),
+                    applicationRows.Count(a => a.AppliedAt.Date >= weekStart && a.AppliedAt.Date < weekEnd),
+                    weekStart);
+            })
+            .ToList();
+
+        var applicationsByStatus = Enum.GetValues<ApplicationStatus>()
+            .Select(status => new AnalyticsCountDto(
+                status.ToString(),
+                applicationRows.Count(a => a.Status == status)))
+            .Where(row => row.Value > 0)
+            .OrderByDescending(row => row.Value)
+            .ToList();
+
+        var topIndustries = await _context.CompanyProfiles
+            .AsNoTracking()
+            .GroupBy(c => c.Industry)
+            .Select(g => new AnalyticsCountDto(g.Key, g.Count()))
+            .OrderByDescending(x => x.Value)
+            .Take(6)
+            .ToListAsync();
+
+        var pendingTestimonials = await _context.Testimonials.CountAsync(t => t.Status == "Pending");
+        var publishedTestimonials = await _context.Testimonials.CountAsync(t => t.Status == "Published");
+
+        return new AdminAnalyticsDto(
+            dashboard.TotalStudents,
+            dashboard.TotalCompanies,
+            dashboard.TotalApplications,
+            dashboard.HiredApplications,
+            dashboard.ActiveJobPosts,
+            dashboard.SignupsLast7Days,
+            dashboard.OpenSupportInquiries,
+            pendingTestimonials,
+            publishedTestimonials,
+            stats.HiringRate,
+            signupsByWeek,
+            applicationsByWeek,
+            applicationsByStatus,
+            topIndustries);
     }
 
     public async Task<PagedResultDto<AdminUserListItemDto>> GetUsersAsync(

@@ -178,6 +178,7 @@ builder.Services.AddScoped<IEmailLogService, EmailLogService>();
 builder.Services.AddScoped<IPlatformStatsService, PlatformStatsService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<ISupportInquiryService, SupportInquiryService>();
+builder.Services.AddScoped<ITestimonialService, TestimonialService>();
 builder.Services.AddSingleton<IRealtimeNotificationService>(sp =>
 {
     var hubContext = sp.GetRequiredService<IHubContext<GradGateway.Api.Hubs.ChatHub>>();

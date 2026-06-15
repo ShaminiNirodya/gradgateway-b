@@ -5,6 +5,7 @@ namespace GradGateway.Business.Interfaces;
 public interface IAdminService
 {
     Task<AdminDashboardDto> GetDashboardAsync();
+    Task<AdminAnalyticsDto> GetAnalyticsAsync();
     Task<PagedResultDto<AdminUserListItemDto>> GetUsersAsync(
         string? role, string? search, bool? activeOnly, int page = 1, int pageSize = Pagination.DefaultPageSize);
     Task SetUserActiveAsync(Guid userId, bool isActive);

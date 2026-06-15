@@ -12,15 +12,18 @@ namespace GradGateway.Api.Controllers;
 public class AdminController : ControllerBase
 {
     private readonly IAdminService _adminService;
+    private readonly ITestimonialService _testimonialService;
     private readonly ILogger<AdminController> _logger;
     private readonly IHostEnvironment _environment;
 
     public AdminController(
         IAdminService adminService,
+        ITestimonialService testimonialService,
         ILogger<AdminController> logger,
         IHostEnvironment environment)
     {
         _adminService = adminService;
+        _testimonialService = testimonialService;
         _logger = logger;
         _environment = environment;
     }
@@ -38,6 +41,23 @@ public class AdminController : ControllerBase
             var message = _environment.IsDevelopment()
                 ? ex.InnerException?.Message ?? ex.Message
                 : "Failed to load admin dashboard.";
+            return StatusCode(500, new { message });
+        }
+    }
+
+    [HttpGet("analytics")]
+    public async Task<IActionResult> GetAnalytics()
+    {
+        try
+        {
+            return Ok(await _adminService.GetAnalyticsAsync());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Admin analytics failed");
+            var message = _environment.IsDevelopment()
+                ? ex.InnerException?.Message ?? ex.Message
+                : "Failed to load admin analytics.";
             return StatusCode(500, new { message });
         }
     }
@@ -150,5 +170,77 @@ public class AdminController : ControllerBase
     public async Task<IActionResult> UpdateSettings([FromBody] AdminUpdatePlatformSettingsDto dto)
     {
         return Ok(await _adminService.UpdatePlatformSettingsAsync(dto));
+    }
+
+    [HttpGet("testimonials")]
+    public async Task<IActionResult> GetTestimonials(
+        [FromQuery] string? status,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = Pagination.DefaultPageSize)
+    {
+        return Ok(await _testimonialService.GetAdminListAsync(status, page, pageSize));
+    }
+
+    [HttpPost("testimonials")]
+    public async Task<IActionResult> CreateTestimonial([FromBody] AdminCreateTestimonialDto dto)
+    {
+        try
+        {
+            return Ok(await _testimonialService.CreateAdminAsync(dto));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("testimonials/{testimonialId:guid}")]
+    public async Task<IActionResult> UpdateTestimonial(Guid testimonialId, [FromBody] AdminUpdateTestimonialDto dto)
+    {
+        try
+        {
+            return Ok(await _testimonialService.UpdateAsync(testimonialId, dto));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPatch("testimonials/{testimonialId:guid}/status")]
+    public async Task<IActionResult> SetTestimonialStatus(
+        Guid testimonialId,
+        [FromBody] AdminSetTestimonialStatusDto dto)
+    {
+        try
+        {
+            return Ok(await _testimonialService.SetStatusAsync(testimonialId, dto.Status));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("testimonials/{testimonialId:guid}")]
+    public async Task<IActionResult> DeleteTestimonial(Guid testimonialId)
+    {
+        try
+        {
+            await _testimonialService.DeleteAsync(testimonialId);
+            return Ok(new { message = "Testimonial deleted." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 }

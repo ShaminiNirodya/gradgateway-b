@@ -20,8 +20,9 @@ public record ConversationResponseDto(
     string? OtherPartyPhotoUrl,
     string LastMessage,
     DateTime LastMessageAt,
-    bool HasUnread
-);
+    bool HasUnread,
+    string Kind = "StudentCompany",
+    string? SupportTargetRole = null);
 
 public record MessageResponseDto(
     Guid Id,

@@ -241,11 +241,16 @@ namespace GradGateway.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("CompanyProfileId")
+                    b.Property<Guid?>("CompanyProfileId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<DateTime>("LastMessageAt")
                         .HasColumnType("datetime2");
@@ -253,16 +258,23 @@ namespace GradGateway.Data.Migrations
                     b.Property<Guid?>("OpportunityId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("StudentProfileId")
+                    b.Property<Guid?>("StudentProfileId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("SupportTargetUserId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 
                     b.HasIndex("CompanyProfileId");
 
+                    b.HasIndex("Kind");
+
                     b.HasIndex("OpportunityId");
 
                     b.HasIndex("StudentProfileId");
+
+                    b.HasIndex("SupportTargetUserId");
 
                     b.ToTable("Conversations");
 
@@ -272,6 +284,7 @@ namespace GradGateway.Data.Migrations
                             Id = new Guid("abababab-1111-2222-3333-444444444444"),
                             CompanyProfileId = new Guid("cccccccc-1111-2222-3333-444444444444"),
                             CreatedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Kind = "StudentCompany",
                             LastMessageAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             OpportunityId = new Guid("dddddddd-1111-2222-3333-444444444444"),
                             StudentProfileId = new Guid("bbbbbbbb-1111-2222-3333-444444444444")
@@ -281,6 +294,7 @@ namespace GradGateway.Data.Migrations
                             Id = new Guid("abababab-1111-2222-3333-555555555555"),
                             CompanyProfileId = new Guid("cccccccc-1111-2222-3333-555555555555"),
                             CreatedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Kind = "StudentCompany",
                             LastMessageAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             OpportunityId = new Guid("dddddddd-1111-2222-3333-555555555555"),
                             StudentProfileId = new Guid("bbbbbbbb-1111-2222-3333-555555555555")
@@ -1031,6 +1045,102 @@ namespace GradGateway.Data.Migrations
                     b.ToTable("SupportInquiries");
                 });
 
+            modelBuilder.Entity("GradGateway.Data.Entities.Testimonial", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AuthorName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("AuthorRole")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("PublishedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Quote")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("SubmitterEmail")
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)");
+
+                    b.Property<string>("SubmitterRole")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<Guid?>("SubmittedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SortOrder");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("Testimonials");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("f1f1f1f1-1111-2222-3333-444444444441"),
+                            AuthorName = "Undergraduate, Colombo",
+                            AuthorRole = "Computer Science",
+                            CreatedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PublishedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Quote = "Having my projects and applications in one place made follow-ups with companies much easier.",
+                            ReviewedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            SortOrder = 1,
+                            Status = "Published"
+                        },
+                        new
+                        {
+                            Id = new Guid("f1f1f1f1-1111-2222-3333-444444444442"),
+                            AuthorName = "Tech recruiter",
+                            AuthorRole = "Hiring partner",
+                            CreatedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PublishedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Quote = "We shortlist faster because we see portfolios, CVs, and message history without switching tools.",
+                            ReviewedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            SortOrder = 2,
+                            Status = "Published"
+                        },
+                        new
+                        {
+                            Id = new Guid("f1f1f1f1-1111-2222-3333-444444444443"),
+                            AuthorName = "HR coordinator",
+                            AuthorRole = "Software company",
+                            CreatedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PublishedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Quote = "The application pipeline and offer flow in messages saved our intern hiring season.",
+                            ReviewedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            SortOrder = 3,
+                            Status = "Published"
+                        });
+                });
+
             modelBuilder.Entity("GradGateway.Data.Entities.Skill", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1445,8 +1555,7 @@ namespace GradGateway.Data.Migrations
                     b.HasOne("GradGateway.Data.Entities.CompanyProfile", "CompanyProfile")
                         .WithMany()
                         .HasForeignKey("CompanyProfileId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("GradGateway.Data.Entities.Opportunity", "Opportunity")
                         .WithMany()
@@ -1456,14 +1565,20 @@ namespace GradGateway.Data.Migrations
                     b.HasOne("GradGateway.Data.Entities.StudentProfile", "StudentProfile")
                         .WithMany()
                         .HasForeignKey("StudentProfileId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("GradGateway.Data.Entities.User", "SupportTargetUser")
+                        .WithMany()
+                        .HasForeignKey("SupportTargetUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("CompanyProfile");
 
                     b.Navigation("Opportunity");
 
                     b.Navigation("StudentProfile");
+
+                    b.Navigation("SupportTargetUser");
                 });
 
             modelBuilder.Entity("GradGateway.Data.Entities.Document", b =>

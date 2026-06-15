@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("GradGateway.Business")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+83a3d687c5b0a397a4a8ade5b69ecfbcbc64ef2e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+43e741abbf9049d56a30e14e0c01fbe0adcae8ac")]
 [assembly: System.Reflection.AssemblyProductAttribute("GradGateway.Business")]
 [assembly: System.Reflection.AssemblyTitleAttribute("GradGateway.Business")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

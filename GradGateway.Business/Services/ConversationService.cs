@@ -28,6 +28,11 @@ public class ConversationService : IConversationService
         var user = await _context.Users.FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid)
                    ?? throw new InvalidOperationException("User not found.");
 
+        if (user.Role == UserRole.Admin)
+        {
+            return await StartAdminSupportConversationAsync(user, dto);
+        }
+
         Guid studentProfileId;
         Guid companyProfileId;
 
@@ -65,9 +70,9 @@ public class ConversationService : IConversationService
             throw new InvalidOperationException("Unsupported role for conversations.");
         }
 
-        // Keep one canonical chat thread per student-company pair.
         var existing = await _context.Conversations
-            .FirstOrDefaultAsync(c => c.StudentProfileId == studentProfileId
+            .FirstOrDefaultAsync(c => c.Kind == ConversationKinds.StudentCompany
+                                   && c.StudentProfileId == studentProfileId
                                    && c.CompanyProfileId == companyProfileId);
 
         var convo = existing;
@@ -76,6 +81,7 @@ public class ConversationService : IConversationService
             convo = new Conversation
             {
                 Id = Guid.NewGuid(),
+                Kind = ConversationKinds.StudentCompany,
                 StudentProfileId = studentProfileId,
                 CompanyProfileId = companyProfileId,
                 OpportunityId = dto.OpportunityId,
@@ -87,7 +93,6 @@ public class ConversationService : IConversationService
         }
         else if (convo.OpportunityId == null && dto.OpportunityId != null)
         {
-            // Backfill opportunity reference when the existing thread was created from talent search.
             convo.OpportunityId = dto.OpportunityId;
             await _context.SaveChangesAsync();
         }
@@ -99,7 +104,15 @@ public class ConversationService : IConversationService
         var other = user.Role == UserRole.Student ? companyName : studentName;
         var otherPhoto = user.Role == UserRole.Student ? companyLogo : studentPhoto;
 
-        return new ConversationResponseDto(convo.Id, convo.OpportunityId, other, otherPhoto, string.Empty, convo.LastMessageAt, false);
+        return new ConversationResponseDto(
+            convo.Id,
+            convo.OpportunityId,
+            other,
+            otherPhoto,
+            string.Empty,
+            convo.LastMessageAt,
+            false,
+            ConversationKinds.StudentCompany);
     }
 
     public async Task<List<ConversationResponseDto>> GetMyConversationsAsync(string firebaseUid)
@@ -113,19 +126,28 @@ public class ConversationService : IConversationService
             .Include(c => c.StudentProfile)
             .Include(c => c.CompanyProfile)
             .Include(c => c.Opportunity)
+            .Include(c => c.SupportTargetUser)
             .OrderByDescending(c => c.LastMessageAt);
 
         if (user.Role == UserRole.Student)
         {
             var student = await _context.StudentProfiles.FirstOrDefaultAsync(s => s.UserId == user.Id)
                           ?? throw new InvalidOperationException("Student profile not found.");
-            query = query.Where(c => c.StudentProfileId == student.Id);
+            query = query.Where(c =>
+                (c.Kind == ConversationKinds.StudentCompany && c.StudentProfileId == student.Id)
+                || (c.Kind == ConversationKinds.AdminSupport && c.SupportTargetUserId == user.Id));
         }
         else if (user.Role == UserRole.Company)
         {
             var company = await _context.CompanyProfiles.FirstOrDefaultAsync(c => c.UserId == user.Id)
                           ?? throw new InvalidOperationException("Company profile not found.");
-            query = query.Where(c => c.CompanyProfileId == company.Id);
+            query = query.Where(c =>
+                (c.Kind == ConversationKinds.StudentCompany && c.CompanyProfileId == company.Id)
+                || (c.Kind == ConversationKinds.AdminSupport && c.SupportTargetUserId == user.Id));
+        }
+        else if (user.Role == UserRole.Admin)
+        {
+            query = query.Where(c => c.Kind == ConversationKinds.AdminSupport);
         }
         else
         {
@@ -133,6 +155,11 @@ public class ConversationService : IConversationService
         }
 
         var rows = await query.ToListAsync();
+        if (rows.Count == 0)
+        {
+            return [];
+        }
+
         var conversationIds = rows.Select(r => r.Id).ToList();
         var lastMessages = await _context.Messages
             .Where(m => conversationIds.Contains(m.ConversationId))
@@ -141,82 +168,55 @@ public class ConversationService : IConversationService
             .ToListAsync();
 
         var lastMessageByConversationId = lastMessages.ToDictionary(x => x.ConversationId, x => x);
+        var unreadSet = await BuildUnreadConversationSetAsync(user, rows, lastMessageByConversationId);
 
-        var unreadConversationIds = await _context.Messages
-            .Where(m => conversationIds.Contains(m.ConversationId)
-                        && !m.IsRead
-                        && m.SenderUserId != user.Id)
-            .Select(m => m.ConversationId)
-            .Distinct()
-            .ToListAsync();
-        var unreadSet = unreadConversationIds.ToHashSet();
-
-        // Merge legacy duplicate threads per student-company pair (unread + latest message across all thread ids).
-        var aggregated = rows
-            .GroupBy(c => new { c.StudentProfileId, c.CompanyProfileId })
-            .Select(group =>
+        if (user.Role == UserRole.Admin)
+        {
+            var adminDtos = new List<ConversationResponseDto>();
+            foreach (var c in rows)
             {
-                var threadIds = group.Select(c => c.Id).ToList();
-                var hasUnread = threadIds.Any(id => unreadSet.Contains(id));
-
-                Message? latestMessage = null;
-                foreach (var threadId in threadIds)
+                if (c.SupportTargetUserId == null)
                 {
-                    if (!lastMessageByConversationId.TryGetValue(threadId, out var candidate))
-                    {
-                        continue;
-                    }
-
-                    if (latestMessage == null || candidate.SentAt > latestMessage.SentAt)
-                    {
-                        latestMessage = candidate;
-                    }
+                    continue;
                 }
 
-                if (latestMessage != null
-                    && latestMessage.SenderUserId != user.Id
-                    && !latestMessage.IsRead)
-                {
-                    hasUnread = true;
-                }
+                var (name, photo, role) = await ResolveSupportTargetDisplayAsync(c.SupportTargetUserId.Value);
+                lastMessageByConversationId.TryGetValue(c.Id, out var lm);
+                adminDtos.Add(new ConversationResponseDto(
+                    c.Id,
+                    null,
+                    name,
+                    photo,
+                    lm?.Content ?? string.Empty,
+                    lm?.SentAt ?? c.LastMessageAt,
+                    unreadSet.Contains(c.Id),
+                    ConversationKinds.AdminSupport,
+                    role));
+            }
 
-                var canonical = group
-                    .OrderByDescending(c => lastMessageByConversationId.ContainsKey(c.Id))
-                    .ThenByDescending(c => lastMessageByConversationId.TryGetValue(c.Id, out var lm) ? lm.SentAt : DateTime.MinValue)
-                    .ThenByDescending(c => c.LastMessageAt)
-                    .First();
+            return adminDtos
+                .OrderByDescending(dto => dto.HasUnread)
+                .ThenByDescending(dto => dto.LastMessageAt)
+                .ToList();
+        }
 
-                var displayConversation = latestMessage != null
-                    ? group.FirstOrDefault(c => c.Id == latestMessage.ConversationId) ?? canonical
-                    : canonical;
+        var studentCompanyRows = rows.Where(c => c.Kind == ConversationKinds.StudentCompany).ToList();
+        var adminSupportRows = rows.Where(c => c.Kind == ConversationKinds.AdminSupport).ToList();
 
-                return new
-                {
-                    Conversation = displayConversation,
-                    HasUnread = hasUnread,
-                    LatestMessage = latestMessage,
-                };
-            })
-            .OrderByDescending(x => x.HasUnread)
-            .ThenByDescending(x => x.LatestMessage?.SentAt ?? x.Conversation.LastMessageAt)
+        var aggregated = studentCompanyRows
+            .GroupBy(c => new { c.StudentProfileId, c.CompanyProfileId })
+            .Select(group => MapStudentCompanyGroup(group.ToList(), user, lastMessageByConversationId, unreadSet))
             .ToList();
 
-        return aggregated.Select(entry =>
-        {
-            var c = entry.Conversation;
-            var lm = entry.LatestMessage;
-            var other = user.Role == UserRole.Student ? c.CompanyProfile.CompanyName : c.StudentProfile.FullName;
-            var otherPhoto = user.Role == UserRole.Student ? c.CompanyProfile.LogoDataUrl : c.StudentProfile.PhotoDataUrl;
-            return new ConversationResponseDto(
-                c.Id,
-                c.OpportunityId,
-                other,
-                otherPhoto,
-                lm?.Content ?? string.Empty,
-                lm?.SentAt ?? c.LastMessageAt,
-                entry.HasUnread
-            );
-        }).ToList();
+        var supportDtos = adminSupportRows
+            .Select(c => MapPlatformSupportForUser(c, lastMessageByConversationId, unreadSet))
+            .ToList();
+
+        return aggregated
+            .Concat(supportDtos)
+            .OrderByDescending(dto => dto.HasUnread)
+            .ThenByDescending(dto => dto.LastMessageAt)
+            .ToList();
     }
 
     public async Task<List<MessageResponseDto>> GetMessagesAsync(string firebaseUid, Guid conversationId)
@@ -234,14 +234,17 @@ public class ConversationService : IConversationService
         if (!isParticipant)
             throw new InvalidOperationException("You are not allowed to view this conversation.");
 
-        // Mark read across every thread for this student–company pair (legacy duplicates may exist).
-        var threadIds = await _context.Conversations
-            .Where(c => c.StudentProfileId == convo.StudentProfileId
-                        && c.CompanyProfileId == convo.CompanyProfileId)
-            .Select(c => c.Id)
-            .ToListAsync();
+        var threadIds = convo.Kind == ConversationKinds.AdminSupport
+            ? [conversationId]
+            : await _context.Conversations
+                .Where(c => c.Kind == ConversationKinds.StudentCompany
+                            && c.StudentProfileId == convo.StudentProfileId
+                            && c.CompanyProfileId == convo.CompanyProfileId)
+                .Select(c => c.Id)
+                .ToListAsync();
 
         var unreadFromOthers = await _context.Messages
+            .Include(m => m.SenderUser)
             .Where(m => threadIds.Contains(m.ConversationId)
                         && m.SenderUserId != user.Id
                         && !m.IsRead)
@@ -258,9 +261,8 @@ public class ConversationService : IConversationService
                 .Where(n => n.UserId == user.Id
                             && !n.IsRead
                             && n.Type == NotificationType.Message
-                            && (convo.OpportunityId == null
-                                ? n.RelatedOpportunityId == null
-                                : n.RelatedOpportunityId == convo.OpportunityId))
+                            && n.RelatedConversationId != null
+                            && threadIds.Contains(n.RelatedConversationId.Value))
                 .ToListAsync();
 
             foreach (var notification in unreadMessageAlerts)
@@ -281,7 +283,7 @@ public class ConversationService : IConversationService
             m.Id,
             m.ConversationId,
             m.SenderUserId,
-            m.SenderUser.Email,
+            FormatSenderName(m.SenderUser, user),
             m.Content,
             m.IsRead,
             m.SentAt,
@@ -327,7 +329,8 @@ public class ConversationService : IConversationService
         convo.LastMessageAt = msg.SentAt;
 
         Notification? offerResponseNotification = null;
-        if (user.Role == UserRole.Student
+        if (convo.Kind == ConversationKinds.StudentCompany
+            && user.Role == UserRole.Student
             && JobOfferResponseMatcher.TryParse(msg.Content, out var offerAccepted))
         {
             offerResponseNotification = await _applicationService.TryApplyJobOfferResponseInConversationAsync(
@@ -336,18 +339,367 @@ public class ConversationService : IConversationService
                 offerAccepted);
         }
 
-        var recipientUserId = user.Role == UserRole.Student
-            ? convo.CompanyProfile.UserId
-            : convo.StudentProfile.UserId;
+        var response = new MessageResponseDto(
+            msg.Id,
+            msg.ConversationId,
+            msg.SenderUserId,
+            FormatSenderName(user, user),
+            msg.Content,
+            msg.IsRead,
+            msg.SentAt,
+            msg.AttachmentUrl,
+            msg.AttachmentName,
+            msg.AttachmentType
+        );
 
-        // One unread message alert per conversation thread (not per message).
+        if (convo.Kind == ConversationKinds.AdminSupport)
+        {
+            await NotifyAdminSupportRecipientsAsync(user, convo, conversationId, response);
+        }
+        else
+        {
+            var recipientUserId = user.Role == UserRole.Student
+                ? convo.CompanyProfile!.UserId
+                : convo.StudentProfile!.UserId;
+
+            await NotifyDirectMessageRecipientAsync(
+                user,
+                convo,
+                conversationId,
+                recipientUserId,
+                response,
+                offerResponseNotification);
+        }
+
+        await _context.SaveChangesAsync();
+        return response;
+    }
+
+    private async Task<ConversationResponseDto> StartAdminSupportConversationAsync(User admin, StartConversationRequestDto dto)
+    {
+        if (dto.StudentProfileId != null && dto.CompanyProfileId != null)
+        {
+            throw new ArgumentException("Provide either StudentProfileId or CompanyProfileId, not both.");
+        }
+
+        if (dto.StudentProfileId == null && dto.CompanyProfileId == null)
+        {
+            throw new ArgumentException("StudentProfileId or CompanyProfileId is required for admin chat start.");
+        }
+
+        Guid supportTargetUserId;
+        string otherName;
+        string? otherPhoto;
+        string supportTargetRole;
+
+        if (dto.StudentProfileId != null)
+        {
+            var student = await _context.StudentProfiles
+                .FirstOrDefaultAsync(s => s.Id == dto.StudentProfileId.Value)
+                ?? throw new ArgumentException("Student profile not found.");
+
+            supportTargetUserId = student.UserId;
+            otherName = student.FullName;
+            otherPhoto = student.PhotoDataUrl;
+            supportTargetRole = "Student";
+        }
+        else
+        {
+            var company = await _context.CompanyProfiles
+                .FirstOrDefaultAsync(c => c.Id == dto.CompanyProfileId!.Value)
+                ?? throw new ArgumentException("Company profile not found.");
+
+            supportTargetUserId = company.UserId;
+            otherName = company.CompanyName;
+            otherPhoto = company.LogoDataUrl;
+            supportTargetRole = "Company";
+        }
+
+        var existing = await _context.Conversations
+            .FirstOrDefaultAsync(c => c.Kind == ConversationKinds.AdminSupport
+                                   && c.SupportTargetUserId == supportTargetUserId);
+
+        var convo = existing ?? new Conversation
+        {
+            Id = Guid.NewGuid(),
+            Kind = ConversationKinds.AdminSupport,
+            SupportTargetUserId = supportTargetUserId,
+            CreatedAt = DateTime.UtcNow,
+            LastMessageAt = DateTime.UtcNow
+        };
+
+        if (existing == null)
+        {
+            _context.Conversations.Add(convo);
+            await _context.SaveChangesAsync();
+        }
+
+        return new ConversationResponseDto(
+            convo.Id,
+            null,
+            otherName,
+            otherPhoto,
+            string.Empty,
+            convo.LastMessageAt,
+            false,
+            ConversationKinds.AdminSupport,
+            supportTargetRole);
+    }
+
+    private async Task<HashSet<Guid>> BuildUnreadConversationSetAsync(
+        User user,
+        List<Conversation> rows,
+        Dictionary<Guid, Message> lastMessageByConversationId)
+    {
+        var conversationIds = rows.Select(r => r.Id).ToList();
+        var adminUserIds = user.Role == UserRole.Admin
+            ? []
+            : await _context.Users
+                .Where(u => u.Role == UserRole.Admin)
+                .Select(u => u.Id)
+                .ToListAsync();
+
+        var unreadConversationIds = await _context.Messages
+            .Where(m => conversationIds.Contains(m.ConversationId)
+                        && !m.IsRead
+                        && m.SenderUserId != user.Id)
+            .Select(m => m.ConversationId)
+            .Distinct()
+            .ToListAsync();
+
+        if (user.Role is UserRole.Student or UserRole.Company)
+        {
+            var unreadFromAdmins = await _context.Messages
+                .Where(m => conversationIds.Contains(m.ConversationId)
+                            && !m.IsRead
+                            && adminUserIds.Contains(m.SenderUserId))
+                .Select(m => m.ConversationId)
+                .Distinct()
+                .ToListAsync();
+
+            unreadConversationIds = unreadConversationIds
+                .Concat(unreadFromAdmins)
+                .Distinct()
+                .ToList();
+        }
+
+        var unreadSet = unreadConversationIds.ToHashSet();
+
+        foreach (var row in rows)
+        {
+            if (!lastMessageByConversationId.TryGetValue(row.Id, out var latestMessage))
+            {
+                continue;
+            }
+
+            if (latestMessage.SenderUserId != user.Id && !latestMessage.IsRead)
+            {
+                unreadSet.Add(row.Id);
+            }
+        }
+
+        return unreadSet;
+    }
+
+    private ConversationResponseDto MapStudentCompanyGroup(
+        List<Conversation> group,
+        User user,
+        Dictionary<Guid, Message> lastMessageByConversationId,
+        HashSet<Guid> unreadSet)
+    {
+        var threadIds = group.Select(c => c.Id).ToList();
+        var hasUnread = threadIds.Any(id => unreadSet.Contains(id));
+
+        Message? latestMessage = null;
+        foreach (var threadId in threadIds)
+        {
+            if (!lastMessageByConversationId.TryGetValue(threadId, out var candidate))
+            {
+                continue;
+            }
+
+            if (latestMessage == null || candidate.SentAt > latestMessage.SentAt)
+            {
+                latestMessage = candidate;
+            }
+        }
+
+        if (latestMessage != null
+            && latestMessage.SenderUserId != user.Id
+            && !latestMessage.IsRead)
+        {
+            hasUnread = true;
+        }
+
+        var canonical = group
+            .OrderByDescending(c => lastMessageByConversationId.ContainsKey(c.Id))
+            .ThenByDescending(c => lastMessageByConversationId.TryGetValue(c.Id, out var lm) ? lm.SentAt : DateTime.MinValue)
+            .ThenByDescending(c => c.LastMessageAt)
+            .First();
+
+        var displayConversation = latestMessage != null
+            ? group.FirstOrDefault(c => c.Id == latestMessage.ConversationId) ?? canonical
+            : canonical;
+
+        var c = displayConversation;
+        var lm = latestMessage;
+        var other = user.Role == UserRole.Student ? c.CompanyProfile!.CompanyName : c.StudentProfile!.FullName;
+        var otherPhoto = user.Role == UserRole.Student ? c.CompanyProfile!.LogoDataUrl : c.StudentProfile!.PhotoDataUrl;
+
+        return new ConversationResponseDto(
+            c.Id,
+            c.OpportunityId,
+            other,
+            otherPhoto,
+            lm?.Content ?? string.Empty,
+            lm?.SentAt ?? c.LastMessageAt,
+            hasUnread,
+            ConversationKinds.StudentCompany);
+    }
+
+    private ConversationResponseDto MapPlatformSupportForUser(
+        Conversation c,
+        Dictionary<Guid, Message> lastMessageByConversationId,
+        HashSet<Guid> unreadSet)
+    {
+        lastMessageByConversationId.TryGetValue(c.Id, out var lm);
+        return new ConversationResponseDto(
+            c.Id,
+            null,
+            PlatformMessaging.SupportDisplayName,
+            null,
+            lm?.Content ?? string.Empty,
+            lm?.SentAt ?? c.LastMessageAt,
+            unreadSet.Contains(c.Id),
+            ConversationKinds.AdminSupport);
+    }
+
+    private async Task<(string Name, string? Photo, string Role)> ResolveSupportTargetDisplayAsync(Guid supportTargetUserId)
+    {
+        var targetUser = await _context.Users.AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == supportTargetUserId);
+
+        if (targetUser == null)
+        {
+            return ("User", null, "User");
+        }
+
+        if (targetUser.Role == UserRole.Student)
+        {
+            var student = await _context.StudentProfiles.AsNoTracking()
+                .FirstOrDefaultAsync(s => s.UserId == supportTargetUserId);
+            return student != null
+                ? (student.FullName, student.PhotoDataUrl, "Student")
+                : ("Student", null, "Student");
+        }
+
+        if (targetUser.Role == UserRole.Company)
+        {
+            var company = await _context.CompanyProfiles.AsNoTracking()
+                .FirstOrDefaultAsync(c => c.UserId == supportTargetUserId);
+            return company != null
+                ? (company.CompanyName, company.LogoDataUrl, "Company")
+                : ("Company", null, "Company");
+        }
+
+        return (targetUser.Email, null, targetUser.Role.ToString());
+    }
+
+    private async Task NotifyAdminSupportRecipientsAsync(
+        User sender,
+        Conversation convo,
+        Guid conversationId,
+        MessageResponseDto response)
+    {
+        if (sender.Role == UserRole.Admin)
+        {
+            if (convo.SupportTargetUserId == null)
+            {
+                return;
+            }
+
+            await NotifyDirectMessageRecipientAsync(sender, convo, conversationId, convo.SupportTargetUserId.Value, response, null);
+            return;
+        }
+
+        var adminUsers = await _context.Users
+            .Where(u => u.Role == UserRole.Admin && u.IsActive)
+            .ToListAsync();
+
+        foreach (var admin in adminUsers)
+        {
+            var staleMessageAlerts = await _context.Notifications
+                .Where(n => n.UserId == admin.Id
+                            && !n.IsRead
+                            && n.Type == NotificationType.Message
+                            && n.RelatedConversationId == conversationId)
+                .ToListAsync();
+
+            foreach (var stale in staleMessageAlerts)
+            {
+                stale.IsRead = true;
+            }
+
+            var messageNotification = new Notification
+            {
+                Id = Guid.NewGuid(),
+                UserId = admin.Id,
+                Type = NotificationType.Message,
+                Title = "New support message",
+                Body = "A user replied in a support conversation.",
+                RelatedConversationId = conversationId,
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.Notifications.Add(messageNotification);
+
+            if (_realtimeNotification != null)
+            {
+                try
+                {
+                    await _realtimeNotification.NotifyNewMessageAsync(admin.Id, response);
+
+                    if (!string.IsNullOrWhiteSpace(admin.FirebaseUid))
+                    {
+                        var notificationDto = new NotificationResponseDto(
+                            messageNotification.Id,
+                            messageNotification.Type.ToString(),
+                            messageNotification.Title,
+                            messageNotification.Body,
+                            messageNotification.IsRead,
+                            messageNotification.CreatedAt,
+                            messageNotification.RelatedOpportunityId,
+                            messageNotification.RelatedApplicationId,
+                            messageNotification.RelatedConversationId,
+                            messageNotification.RelatedStudentProfileId);
+                        await _realtimeNotification.NotifyNotificationAsync(admin.FirebaseUid, notificationDto);
+                    }
+                }
+                catch
+                {
+                    // Continue even if SignalR fails.
+                }
+            }
+        }
+    }
+
+    private async Task NotifyDirectMessageRecipientAsync(
+        User sender,
+        Conversation convo,
+        Guid conversationId,
+        Guid recipientUserId,
+        MessageResponseDto response,
+        Notification? offerResponseNotification)
+    {
         var staleMessageAlerts = await _context.Notifications
             .Where(n => n.UserId == recipientUserId
                         && !n.IsRead
                         && n.Type == NotificationType.Message
-                        && (convo.OpportunityId == null
-                            ? n.RelatedOpportunityId == null
-                            : n.RelatedOpportunityId == convo.OpportunityId))
+                        && (convo.Kind == ConversationKinds.AdminSupport
+                            ? n.RelatedConversationId == conversationId
+                            : convo.OpportunityId == null
+                                ? n.RelatedOpportunityId == null
+                                : n.RelatedOpportunityId == convo.OpportunityId))
             .ToListAsync();
 
         foreach (var stale in staleMessageAlerts)
@@ -360,11 +712,13 @@ public class ConversationService : IConversationService
             Id = Guid.NewGuid(),
             UserId = recipientUserId,
             Type = NotificationType.Message,
-            Title = "New message",
-            Body = "You received a new message.",
+            Title = convo.Kind == ConversationKinds.AdminSupport ? "Message from GradGateway" : "New message",
+            Body = convo.Kind == ConversationKinds.AdminSupport
+                ? "You received a message from the GradGateway team."
+                : "You received a new message.",
             RelatedOpportunityId = convo.OpportunityId,
             RelatedConversationId = conversationId,
-            RelatedStudentProfileId = user.Role == UserRole.Student
+            RelatedStudentProfileId = sender.Role == UserRole.Student
                 ? convo.StudentProfileId
                 : null,
             IsRead = false,
@@ -372,22 +726,6 @@ public class ConversationService : IConversationService
         };
         _context.Notifications.Add(messageNotification);
 
-        await _context.SaveChangesAsync();
-
-        var response = new MessageResponseDto(
-            msg.Id,
-            msg.ConversationId,
-            msg.SenderUserId,
-            user.Email,
-            msg.Content,
-            msg.IsRead,
-            msg.SentAt,
-            msg.AttachmentUrl,
-            msg.AttachmentName,
-            msg.AttachmentType
-        );
-
-        // Send real-time notification via SignalR
         if (_realtimeNotification != null)
         {
             try
@@ -408,8 +746,7 @@ public class ConversationService : IConversationService
                         messageNotification.RelatedOpportunityId,
                         messageNotification.RelatedApplicationId,
                         messageNotification.RelatedConversationId,
-                        messageNotification.RelatedStudentProfileId
-                    );
+                        messageNotification.RelatedStudentProfileId);
                     await _realtimeNotification.NotifyNotificationAsync(recipient.FirebaseUid, notificationDto);
                 }
 
@@ -429,24 +766,18 @@ public class ConversationService : IConversationService
                             offerResponseNotification.RelatedOpportunityId,
                             offerResponseNotification.RelatedApplicationId,
                             offerResponseNotification.RelatedConversationId,
-                            offerResponseNotification.RelatedStudentProfileId
-                        );
+                            offerResponseNotification.RelatedStudentProfileId);
                         await _realtimeNotification.NotifyNotificationAsync(companyUser.FirebaseUid, offerNotifDto);
                     }
                 }
             }
             catch
             {
-                // Continue even if SignalR fails (fallback to polling)
+                // Continue even if SignalR fails.
             }
         }
-
-        return response;
     }
 
-    /// <summary>
-    /// Keeps at most one unread "New message" notification per opportunity thread.
-    /// </summary>
     private async Task CollapseStaleMessageNotificationsAsync(Guid userId)
     {
         var unreadMessageAlerts = await _context.Notifications
@@ -483,6 +814,16 @@ public class ConversationService : IConversationService
 
     private async Task<bool> IsParticipant(User user, Conversation convo)
     {
+        if (convo.Kind == ConversationKinds.AdminSupport)
+        {
+            if (user.Role == UserRole.Admin)
+            {
+                return true;
+            }
+
+            return convo.SupportTargetUserId == user.Id;
+        }
+
         if (user.Role == UserRole.Student)
         {
             var student = await _context.StudentProfiles.FirstOrDefaultAsync(s => s.UserId == user.Id);
@@ -496,5 +837,15 @@ public class ConversationService : IConversationService
         }
 
         return false;
+    }
+
+    private static string FormatSenderName(User sender, User viewer)
+    {
+        if (sender.Role == UserRole.Admin && viewer.Role != UserRole.Admin)
+        {
+            return PlatformMessaging.SupportDisplayName;
+        }
+
+        return sender.Email;
     }
 }

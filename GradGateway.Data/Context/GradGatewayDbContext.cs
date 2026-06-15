@@ -27,6 +27,7 @@ public class GradGatewayDbContext : DbContext
     public DbSet<EmailLog> EmailLogs { get; set; }
     public DbSet<PlatformSettings> PlatformSettings { get; set; }
     public DbSet<SupportInquiry> SupportInquiries { get; set; }
+    public DbSet<Testimonial> Testimonials { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -407,6 +408,9 @@ public class GradGatewayDbContext : DbContext
 
         modelBuilder.Entity<Conversation>(entity =>
         {
+            entity.Property(p => p.Kind).HasMaxLength(20).HasDefaultValue("StudentCompany");
+            entity.HasIndex(p => p.Kind);
+            entity.HasIndex(p => p.SupportTargetUserId);
             entity.HasIndex(p => p.StudentProfileId);
             entity.HasIndex(p => p.CompanyProfileId);
             entity.HasIndex(p => p.OpportunityId);
@@ -424,6 +428,11 @@ public class GradGatewayDbContext : DbContext
             entity.HasOne(p => p.Opportunity)
                 .WithMany()
                 .HasForeignKey(p => p.OpportunityId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(p => p.SupportTargetUser)
+                .WithMany()
+                .HasForeignKey(p => p.SupportTargetUserId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -625,6 +634,7 @@ public class GradGatewayDbContext : DbContext
             new Conversation
             {
                 Id = conversationId1,
+                Kind = "StudentCompany",
                 StudentProfileId = studentProfileId,
                 CompanyProfileId = companyProfileId,
                 OpportunityId = opportunityId1,
@@ -634,6 +644,7 @@ public class GradGatewayDbContext : DbContext
             new Conversation
             {
                 Id = conversationId2,
+                Kind = "StudentCompany",
                 StudentProfileId = studentProfileId2,
                 CompanyProfileId = companyProfileId2,
                 OpportunityId = opportunityId2,

@@ -520,14 +520,16 @@ public class ApplicationService : IApplicationService
             return null;
 
         var conversation = await _context.Conversations
-            .FirstOrDefaultAsync(c => c.Id == conversationId && c.StudentProfileId == student.Id);
-        if (conversation == null)
+            .FirstOrDefaultAsync(c => c.Id == conversationId
+                                   && c.Kind == ConversationKinds.StudentCompany
+                                   && c.StudentProfileId == student.Id);
+        if (conversation == null || conversation.CompanyProfileId == null)
             return null;
 
         Application? app = await FindPendingOfferForConversationAsync(
             student.Id,
             conversationId,
-            conversation.CompanyProfileId,
+            conversation.CompanyProfileId.Value,
             applicationId);
 
         if (app == null)
@@ -544,7 +546,7 @@ public class ApplicationService : IApplicationService
                 app = await FindPendingOfferForConversationAsync(
                     student.Id,
                     conversationId,
-                    conversation.CompanyProfileId,
+                    conversation.CompanyProfileId.Value,
                     applicationId);
             }
         }
@@ -595,8 +597,10 @@ public class ApplicationService : IApplicationService
             throw new InvalidOperationException("Student profile not found.");
 
         var conversation = await _context.Conversations
-            .FirstOrDefaultAsync(c => c.Id == conversationId && c.StudentProfileId == student.Id);
-        if (conversation == null)
+            .FirstOrDefaultAsync(c => c.Id == conversationId
+                                   && c.Kind == ConversationKinds.StudentCompany
+                                   && c.StudentProfileId == student.Id);
+        if (conversation == null || conversation.CompanyProfileId == null)
             throw new ArgumentException("Conversation not found.");
 
         var notif = await TryApplyJobOfferResponseInConversationAsync(
@@ -624,7 +628,7 @@ public class ApplicationService : IApplicationService
             : await FindOfferApplicationForConversationAsync(
                 student.Id,
                 conversationId,
-                conversation.CompanyProfileId);
+                conversation.CompanyProfileId.Value);
 
         if (app == null)
             throw new InvalidOperationException("No pending job offer found for this conversation.");
@@ -747,8 +751,8 @@ public class ApplicationService : IApplicationService
             return 0;
 
         var conversations = await _context.Conversations
-            .Where(c => c.StudentProfileId == student.Id)
-            .Select(c => new ConversationContext(c.Id, c.CompanyProfileId, c.OpportunityId))
+            .Where(c => c.Kind == ConversationKinds.StudentCompany && c.StudentProfileId == student.Id)
+            .Select(c => new ConversationContext(c.Id, c.CompanyProfileId!.Value, c.OpportunityId))
             .ToListAsync();
 
         var conversationIds = conversations.Select(c => c.Id).ToList();
@@ -767,10 +771,10 @@ public class ApplicationService : IApplicationService
             studentMessages = await _context.Messages
                 .Where(m => m.SenderUserId == userId && conversationIds.Contains(m.ConversationId))
                 .Join(
-                    _context.Conversations,
+                    _context.Conversations.Where(c => c.Kind == ConversationKinds.StudentCompany),
                     m => m.ConversationId,
                     c => c.Id,
-                    (m, c) => new StudentThreadMessage(m.Content, m.SentAt, m.ConversationId, c.CompanyProfileId))
+                    (m, c) => new StudentThreadMessage(m.Content, m.SentAt, m.ConversationId, c.CompanyProfileId!.Value))
                 .OrderByDescending(x => x.SentAt)
                 .ToListAsync();
 

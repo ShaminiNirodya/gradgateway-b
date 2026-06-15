@@ -24,6 +24,16 @@ public class SupportInquiryService : ISupportInquiryService
             throw new ArgumentException("Name, email, type, and message are required.");
         }
 
+        if (string.IsNullOrWhiteSpace(dto.Message) || dto.Message.Trim().Length < 10)
+        {
+            throw new ArgumentException("Message must be at least 10 characters.");
+        }
+
+        if (dto.Message.Trim().Length > 2000)
+        {
+            throw new ArgumentException("Message must be 2000 characters or fewer.");
+        }
+
         var row = new SupportInquiry
         {
             Id = Guid.NewGuid(),
@@ -33,7 +43,7 @@ public class SupportInquiryService : ISupportInquiryService
             InquiryType = dto.Type.Trim(),
             Message = dto.Message.Trim(),
             AttachmentName = string.IsNullOrWhiteSpace(dto.AttachmentName) ? null : dto.AttachmentName.Trim(),
-            SubmitterRole = string.IsNullOrWhiteSpace(dto.SubmitterRole) ? null : dto.SubmitterRole.Trim(),
+            SubmitterRole = string.IsNullOrWhiteSpace(dto.SubmitterRole) ? "Public" : dto.SubmitterRole.Trim(),
             Status = "Open",
             CreatedAt = DateTime.UtcNow
         };

@@ -17,7 +17,8 @@ public record AdminDashboardDto(
     int ActiveJobPosts,
     int ExpiredJobPosts,
     int OpenSupportInquiries,
-    int TotalSupportInquiries
+    int TotalSupportInquiries,
+    int PendingTestimonials
 );
 
 public record AdminUserListItemDto(
