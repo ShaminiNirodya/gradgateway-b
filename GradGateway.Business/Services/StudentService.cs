@@ -337,60 +337,169 @@ public class StudentService : IStudentService
 
     public async Task<List<StudentDirectoryItemDto>> GetStudentDirectoryAsync(string? query)
     {
-        var term = (query ?? string.Empty).Trim().ToLower();
+        var result = await SearchStudentDirectoryAsync(new StudentDirectorySearchRequest(
+            Query: query,
+            Page: 1,
+            PageSize: Pagination.MaxPageSize));
+        return result.Items.ToList();
+    }
 
-        var rows = await _context.StudentProfiles
+    public async Task<PagedResultDto<StudentDirectoryItemDto>> SearchStudentDirectoryAsync(StudentDirectorySearchRequest request)
+    {
+        var (page, pageSize) = Pagination.Normalize(request.Page, request.PageSize);
+        var term = (request.Query ?? string.Empty).Trim().ToLower();
+        var universities = ParseCsvList(request.Universities);
+        var degrees = ParseCsvList(request.Degrees);
+        var skills = ParseCsvList(request.Skills);
+        var availability = ParseCsvList(request.Availability);
+        var sort = (request.Sort ?? "Relevance").Trim();
+
+        var query = _context.StudentProfiles
+            .AsNoTracking()
             .Include(s => s.User)
-            .Where(s => s.User.IsActive)
-            .OrderByDescending(s => s.UpdatedAt)
+            .Where(s => s.User.IsActive);
+
+        if (universities.Count > 0)
+        {
+            query = query.Where(s => universities.Contains(s.University));
+        }
+
+        if (degrees.Count > 0)
+        {
+            query = query.Where(s => degrees.Contains(s.Degree));
+        }
+
+        if (request.GradYear is > 0)
+        {
+            query = query.Where(s => s.GradYear == request.GradYear.Value);
+        }
+
+        if (request.GpaMin is >= 0)
+        {
+            query = query.Where(s => s.Gpa >= request.GpaMin.Value);
+        }
+
+        if (request.GpaMax is >= 0)
+        {
+            query = query.Where(s => s.Gpa <= request.GpaMax.Value);
+        }
+
+        if (availability.Count > 0)
+        {
+            query = query.Where(s => availability.Contains(s.Availability));
+        }
+
+        if (!string.IsNullOrWhiteSpace(term))
+        {
+            query = query.Where(s =>
+                s.FullName.ToLower().Contains(term) ||
+                s.University.ToLower().Contains(term) ||
+                s.Degree.ToLower().Contains(term) ||
+                s.FieldOfMajor.ToLower().Contains(term));
+        }
+
+        foreach (var skill in skills)
+        {
+            var skillLower = skill.ToLower();
+            query = query.Where(s =>
+                _context.StudentSkills.Any(ss =>
+                    ss.StudentProfileId == s.Id &&
+                    ss.Skill.Name.ToLower() == skillLower) ||
+                _context.Projects.Any(p =>
+                    p.StudentProfileId == s.Id &&
+                    p.TechStack.ToLower().Contains(skillLower)));
+        }
+
+        query = sort switch
+        {
+            "GPA" => query.OrderByDescending(s => s.Gpa).ThenByDescending(s => s.UpdatedAt),
+            "Class" => query.OrderByDescending(s => s.GradYear).ThenByDescending(s => s.UpdatedAt),
+            _ => query.OrderByDescending(s => s.UpdatedAt),
+        };
+
+        var total = await query.CountAsync();
+        var rows = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
 
+        var items = await MapDirectoryItemsAsync(rows);
+
+        return new PagedResultDto<StudentDirectoryItemDto>(items, total, page, pageSize);
+    }
+
+    public async Task<StudentDirectoryItemDto?> GetStudentDirectoryItemByProfileIdAsync(Guid studentProfileId)
+    {
+        var profile = await _context.StudentProfiles
+            .AsNoTracking()
+            .Include(s => s.User)
+            .FirstOrDefaultAsync(s => s.Id == studentProfileId && s.User.IsActive);
+
+        if (profile == null)
+        {
+            return null;
+        }
+
+        var items = await MapDirectoryItemsAsync([profile]);
+        return items.FirstOrDefault();
+    }
+
+    private static List<string> ParseCsvList(string? raw) =>
+        string.IsNullOrWhiteSpace(raw)
+            ? []
+            : raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+    private async Task<List<StudentDirectoryItemDto>> MapDirectoryItemsAsync(IReadOnlyList<StudentProfile> rows)
+    {
+        if (rows.Count == 0)
+        {
+            return [];
+        }
+
         var profileIds = rows.Select(r => r.Id).ToList();
-        
-        // Get skills from both StudentSkills table and project tech stacks
+
         var studentSkills = await _context.StudentSkills
+            .AsNoTracking()
             .Include(ss => ss.Skill)
             .Where(ss => profileIds.Contains(ss.StudentProfileId))
             .ToListAsync();
 
         var projects = await _context.Projects
+            .AsNoTracking()
             .Where(p => profileIds.Contains(p.StudentProfileId))
             .Select(p => new { p.StudentProfileId, p.TechStack })
             .ToListAsync();
 
         var skillMap = new Dictionary<Guid, string>();
-        
+
         foreach (var profileId in profileIds)
         {
-            var skillSet = new HashSet<string>();
-            
-            // Add skills from StudentSkills table
-            var directSkills = studentSkills
-                .Where(ss => ss.StudentProfileId == profileId)
-                .Select(ss => ss.Skill.Name)
-                .Where(name => !string.IsNullOrWhiteSpace(name));
-            
-            foreach (var skill in directSkills)
+            var skillSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var skill in studentSkills
+                         .Where(ss => ss.StudentProfileId == profileId)
+                         .Select(ss => ss.Skill.Name)
+                         .Where(name => !string.IsNullOrWhiteSpace(name)))
             {
                 skillSet.Add(skill);
             }
-            
-            // Add skills from project tech stacks
-            var projectSkills = projects
-                .Where(p => p.StudentProfileId == profileId && !string.IsNullOrWhiteSpace(p.TechStack))
-                .SelectMany(p => p.TechStack.Split(','))
-                .Select(s => s.Trim())
-                .Where(s => !string.IsNullOrWhiteSpace(s));
-            
-            foreach (var skill in projectSkills)
+
+            foreach (var skill in projects
+                         .Where(p => p.StudentProfileId == profileId && !string.IsNullOrWhiteSpace(p.TechStack))
+                         .SelectMany(p => p.TechStack.Split(','))
+                         .Select(s => s.Trim())
+                         .Where(s => !string.IsNullOrWhiteSpace(s)))
             {
                 skillSet.Add(skill);
             }
-            
+
             skillMap[profileId] = string.Join(", ", skillSet.OrderBy(s => s));
         }
 
-        var data = rows.Select(s =>
+        return rows.Select(s =>
         {
             var skillText = skillMap.TryGetValue(s.Id, out var value) ? value : string.Empty;
             return new StudentDirectoryItemDto(
@@ -406,30 +515,8 @@ public class StudentService : IStudentService
                 skillText,
                 s.PhotoDataUrl,
                 s.Availability,
-                s.CvUrl
-            );
-        });
-
-        if (string.IsNullOrWhiteSpace(term))
-        {
-            return data.ToList();
-        }
-
-        return data
-            .Where(d =>
-                d.FullName.ToLower().Contains(term) ||
-                d.University.ToLower().Contains(term) ||
-                d.Degree.ToLower().Contains(term) ||
-                d.FieldOfMajor.ToLower().Contains(term) ||
-                d.Skills.ToLower().Contains(term)
-            )
-            .ToList();
-    }
-
-    public async Task<StudentDirectoryItemDto?> GetStudentDirectoryItemByProfileIdAsync(Guid studentProfileId)
-    {
-        var rows = await GetStudentDirectoryAsync(null);
-        return rows.FirstOrDefault(r => r.StudentProfileId == studentProfileId);
+                s.CvUrl);
+        }).ToList();
     }
 
     public async Task<List<StudentSkillDto>> GetMySkillsAsync(string firebaseUid)

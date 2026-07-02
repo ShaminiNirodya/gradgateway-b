@@ -35,38 +35,53 @@ public class AdminService : IAdminService
         var sevenDaysAgo = DateTime.UtcNow.AddDays(-7);
         var todaySl = DeadlineClock.TodayDateInSriLanka();
 
-        var totalUsers = await _context.Users.CountAsync();
-        var activeUsers = await _context.Users.CountAsync(u => u.IsActive);
-        var suspendedUsers = await _context.Users.CountAsync(u => !u.IsActive);
-        var studentAccounts = await _context.Users.CountAsync(u => u.Role == UserRole.Student);
-        var companyAccounts = await _context.Users.CountAsync(u => u.Role == UserRole.Company);
-        var adminAccounts = await _context.Users.CountAsync(u => u.Role == UserRole.Admin);
-        var totalApplications = await _context.Applications.CountAsync();
-        var hiredApplications = await _context.Applications
-            .CountAsync(a => a.Status == ApplicationStatus.Hired);
-        var signups7d = await _context.Users.CountAsync(u => u.CreatedAt >= sevenDaysAgo);
-        var activeJobs = await _context.Opportunities.CountAsync(o =>
+        var userAgg = await _context.Users
+            .AsNoTracking()
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                Active = g.Count(u => u.IsActive),
+                Suspended = g.Count(u => !u.IsActive),
+                Students = g.Count(u => u.Role == UserRole.Student),
+                Companies = g.Count(u => u.Role == UserRole.Company),
+                Admins = g.Count(u => u.Role == UserRole.Admin),
+                Signups7d = g.Count(u => u.CreatedAt >= sevenDaysAgo),
+            })
+            .FirstOrDefaultAsync();
+
+        var applicationAgg = await _context.Applications
+            .AsNoTracking()
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                Hired = g.Count(a => a.Status == ApplicationStatus.Hired),
+            })
+            .FirstOrDefaultAsync();
+
+        var activeJobs = await _context.Opportunities.AsNoTracking().CountAsync(o =>
             o.IsActive && o.DeadlineAt.Date >= todaySl);
-        var expiredJobs = await _context.Opportunities.CountAsync(o =>
+        var expiredJobs = await _context.Opportunities.AsNoTracking().CountAsync(o =>
             !o.IsActive || o.DeadlineAt.Date < todaySl);
-        var openInquiries = await _context.SupportInquiries.CountAsync(i => i.Status == "Open");
-        var totalInquiries = await _context.SupportInquiries.CountAsync();
-        var pendingTestimonials = await _context.Testimonials.CountAsync(t => t.Status == "Pending");
+        var openInquiries = await _context.SupportInquiries.AsNoTracking().CountAsync(i => i.Status == "Open");
+        var totalInquiries = await _context.SupportInquiries.AsNoTracking().CountAsync();
+        var pendingTestimonials = await _context.Testimonials.AsNoTracking().CountAsync(t => t.Status == "Pending");
 
         return new AdminDashboardDto(
             stats.TotalStudents,
             stats.TotalCompanies,
             stats.TotalProjects,
             stats.HiringRate,
-            totalUsers,
-            activeUsers,
-            suspendedUsers,
-            studentAccounts,
-            companyAccounts,
-            adminAccounts,
-            totalApplications,
-            hiredApplications,
-            signups7d,
+            userAgg?.Total ?? 0,
+            userAgg?.Active ?? 0,
+            userAgg?.Suspended ?? 0,
+            userAgg?.Students ?? 0,
+            userAgg?.Companies ?? 0,
+            userAgg?.Admins ?? 0,
+            applicationAgg?.Total ?? 0,
+            applicationAgg?.Hired ?? 0,
+            userAgg?.Signups7d ?? 0,
             activeJobs,
             expiredJobs,
             openInquiries,

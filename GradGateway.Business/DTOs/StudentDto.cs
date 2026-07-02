@@ -82,3 +82,16 @@ public record StudentDirectoryItemDto(
     string Availability,
     string? CvUrl = null
 );
+
+public record StudentDirectorySearchRequest(
+    string? Query = null,
+    string? Universities = null,
+    string? Degrees = null,
+    int? GradYear = null,
+    decimal? GpaMin = null,
+    decimal? GpaMax = null,
+    string? Skills = null,
+    string? Availability = null,
+    string? Sort = null,
+    int Page = 1,
+    int PageSize = Pagination.DefaultPageSize);

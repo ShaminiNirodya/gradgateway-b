@@ -54,12 +54,12 @@ END
                 string body,
                 string audiences,
                 int sortOrder,
-                string? summary = null,
-                string? stepsJson = null,
-                string? category = null,
-                string? slug = null,
-                string? linkHref = null,
-                string? linkLabel = null)
+                string summary = null,
+                string stepsJson = null,
+                string category = null,
+                string slug = null,
+                string linkHref = null,
+                string linkLabel = null)
             {
                 var summarySql = summary == null ? "NULL" : $"N'{Escape(summary)}'";
                 var stepsSql = stepsJson == null ? "NULL" : $"N'{Escape(stepsJson)}'";

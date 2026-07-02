@@ -12,10 +12,14 @@ namespace GradGateway.Data.Migrations
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // Separate batches: SQL Server validates column names at compile time,
+            // so ADD and UPDATE cannot reference a new column in the same batch.
             migrationBuilder.Sql(@"
 IF COL_LENGTH(N'StudentProfiles', N'HackathonsCompetitionsJson') IS NULL
     ALTER TABLE [StudentProfiles] ADD [HackathonsCompetitionsJson] nvarchar(max) NULL;
+");
 
+            migrationBuilder.Sql(@"
 IF COL_LENGTH(N'StudentProfiles', N'HackathonsJson') IS NOT NULL
    OR COL_LENGTH(N'StudentProfiles', N'CompetitionsJson') IS NOT NULL
 BEGIN
@@ -35,7 +39,9 @@ BEGIN
          OR NULLIF(LTRIM(RTRIM(ISNULL([CompetitionsJson], N''))), N'') IS NOT NULL
       );
 END
+");
 
+            migrationBuilder.Sql(@"
 IF COL_LENGTH(N'StudentProfiles', N'CompetitionsJson') IS NOT NULL
     ALTER TABLE [StudentProfiles] DROP COLUMN [CompetitionsJson];
 
@@ -52,15 +58,20 @@ IF COL_LENGTH(N'StudentProfiles', N'HackathonsJson') IS NULL
 
 IF COL_LENGTH(N'StudentProfiles', N'CompetitionsJson') IS NULL
     ALTER TABLE [StudentProfiles] ADD [CompetitionsJson] nvarchar(max) NULL;
+");
 
+            migrationBuilder.Sql(@"
 IF COL_LENGTH(N'StudentProfiles', N'HackathonsCompetitionsJson') IS NOT NULL
 BEGIN
     UPDATE [StudentProfiles]
     SET [HackathonsJson] = [HackathonsCompetitionsJson]
     WHERE [HackathonsCompetitionsJson] IS NOT NULL;
-
-    ALTER TABLE [StudentProfiles] DROP COLUMN [HackathonsCompetitionsJson];
 END
+");
+
+            migrationBuilder.Sql(@"
+IF COL_LENGTH(N'StudentProfiles', N'HackathonsCompetitionsJson') IS NOT NULL
+    ALTER TABLE [StudentProfiles] DROP COLUMN [HackathonsCompetitionsJson];
 ");
         }
     }

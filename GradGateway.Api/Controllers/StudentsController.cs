@@ -217,7 +217,18 @@ public class StudentsController : ControllerBase
 
     [HttpGet("directory")]
     [Authorize]
-    public async Task<IActionResult> GetStudentDirectory([FromQuery] string? q = null)
+    public async Task<IActionResult> GetStudentDirectory(
+        [FromQuery] string? q = null,
+        [FromQuery] string? universities = null,
+        [FromQuery] string? degrees = null,
+        [FromQuery] int? gradYear = null,
+        [FromQuery] decimal? gpaMin = null,
+        [FromQuery] decimal? gpaMax = null,
+        [FromQuery] string? skills = null,
+        [FromQuery] string? availability = null,
+        [FromQuery] string? sort = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = Pagination.DefaultPageSize)
     {
         try
         {
@@ -229,8 +240,19 @@ public class StudentsController : ControllerBase
                 return Unauthorized(new { message = "Invalid token: Firebase UID not found" });
             }
 
-            var rows = await _studentService.GetStudentDirectoryAsync(q);
-            return Ok(rows);
+            var result = await _studentService.SearchStudentDirectoryAsync(new StudentDirectorySearchRequest(
+                q,
+                universities,
+                degrees,
+                gradYear,
+                gpaMin,
+                gpaMax,
+                skills,
+                availability,
+                sort,
+                page,
+                pageSize));
+            return Ok(result);
         }
         catch (Exception ex)
         {

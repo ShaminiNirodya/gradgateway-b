@@ -224,6 +224,13 @@ public class GradGatewayDbContext : DbContext
         {
             entity.HasIndex(p => p.StudentId).IsUnique();
             entity.HasIndex(p => p.UserId).IsUnique();
+            entity.HasIndex(p => p.UpdatedAt);
+            entity.HasIndex(p => p.University);
+            entity.HasIndex(p => p.GradYear);
+            entity.HasIndex(p => p.Gpa);
+
+            entity.Property(p => p.University).HasMaxLength(200);
+            entity.Property(p => p.Degree).HasMaxLength(200);
 
             entity.HasOne(p => p.User)
                 .WithMany()
@@ -392,6 +399,7 @@ public class GradGatewayDbContext : DbContext
         {
             entity.HasIndex(p => p.OpportunityId);
             entity.HasIndex(p => p.StudentProfileId);
+            entity.HasIndex(p => p.AppliedAt);
             entity.HasIndex(p => new { p.OpportunityId, p.StudentProfileId })
                 .IsUnique()
                 .HasFilter("[OpportunityId] IS NOT NULL");

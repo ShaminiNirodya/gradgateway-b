@@ -2064,6 +2064,7 @@
           "FirebaseAdmin": "3.2.0",
           "GradGateway.Data": "1.0.0",
           "MailKit": "4.16.0",
+          "Microsoft.Extensions.Caching.Abstractions": "9.0.0",
           "Microsoft.Extensions.Hosting.Abstractions": "9.0.0",
           "Microsoft.Extensions.Logging.Abstractions": "9.0.0",
           "Microsoft.Extensions.Options": "9.0.0"

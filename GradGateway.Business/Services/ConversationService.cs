@@ -177,6 +177,14 @@ public class ConversationService : IConversationService
 
         if (user.Role == UserRole.Admin)
         {
+            var supportTargetIds = rows
+                .Where(c => c.SupportTargetUserId != null)
+                .Select(c => c.SupportTargetUserId!.Value)
+                .Distinct()
+                .ToList();
+
+            var displayByUserId = await ResolveSupportTargetDisplayBatchAsync(supportTargetIds);
+
             var adminDtos = new List<ConversationResponseDto>();
             foreach (var c in rows)
             {
@@ -185,7 +193,11 @@ public class ConversationService : IConversationService
                     continue;
                 }
 
-                var (name, photo, role) = await ResolveSupportTargetDisplayAsync(c.SupportTargetUserId.Value);
+                displayByUserId.TryGetValue(
+                    c.SupportTargetUserId.Value,
+                    out var display);
+                var (name, photo, role) = display;
+
                 lastMessageByConversationId.TryGetValue(c.Id, out var lm);
                 adminDtos.Add(new ConversationResponseDto(
                     c.Id,
@@ -653,35 +665,67 @@ public class ConversationService : IConversationService
             ConversationKinds.AdminSupport);
     }
 
+    private async Task<Dictionary<Guid, (string Name, string? Photo, string Role)>> ResolveSupportTargetDisplayBatchAsync(
+        IReadOnlyList<Guid> supportTargetUserIds)
+    {
+        if (supportTargetUserIds.Count == 0)
+        {
+            return new Dictionary<Guid, (string Name, string? Photo, string Role)>();
+        }
+
+        var users = await _context.Users.AsNoTracking()
+            .Where(u => supportTargetUserIds.Contains(u.Id))
+            .ToListAsync();
+
+        var studentProfiles = await _context.StudentProfiles.AsNoTracking()
+            .Where(s => supportTargetUserIds.Contains(s.UserId))
+            .ToListAsync();
+
+        var companyProfiles = await _context.CompanyProfiles.AsNoTracking()
+            .Where(c => supportTargetUserIds.Contains(c.UserId))
+            .ToListAsync();
+
+        var result = new Dictionary<Guid, (string Name, string? Photo, string Role)>();
+
+        foreach (var targetUserId in supportTargetUserIds)
+        {
+            var targetUser = users.FirstOrDefault(u => u.Id == targetUserId);
+            if (targetUser == null)
+            {
+                result[targetUserId] = ("User", null, "User");
+                continue;
+            }
+
+            if (targetUser.Role == UserRole.Student)
+            {
+                var student = studentProfiles.FirstOrDefault(s => s.UserId == targetUserId);
+                result[targetUserId] = student != null
+                    ? (student.FullName, student.PhotoDataUrl, "Student")
+                    : ("Student", null, "Student");
+                continue;
+            }
+
+            if (targetUser.Role == UserRole.Company)
+            {
+                var company = companyProfiles.FirstOrDefault(c => c.UserId == targetUserId);
+                result[targetUserId] = company != null
+                    ? (company.CompanyName, company.LogoDataUrl, "Company")
+                    : ("Company", null, "Company");
+                continue;
+            }
+
+            result[targetUserId] = (targetUser.Email, null, targetUser.Role.ToString());
+        }
+
+        return result;
+    }
+
     private async Task<(string Name, string? Photo, string Role)> ResolveSupportTargetDisplayAsync(Guid supportTargetUserId)
     {
-        var targetUser = await _context.Users.AsNoTracking()
-            .FirstOrDefaultAsync(u => u.Id == supportTargetUserId);
-
-        if (targetUser == null)
-        {
-            return ("User", null, "User");
-        }
-
-        if (targetUser.Role == UserRole.Student)
-        {
-            var student = await _context.StudentProfiles.AsNoTracking()
-                .FirstOrDefaultAsync(s => s.UserId == supportTargetUserId);
-            return student != null
-                ? (student.FullName, student.PhotoDataUrl, "Student")
-                : ("Student", null, "Student");
-        }
-
-        if (targetUser.Role == UserRole.Company)
-        {
-            var company = await _context.CompanyProfiles.AsNoTracking()
-                .FirstOrDefaultAsync(c => c.UserId == supportTargetUserId);
-            return company != null
-                ? (company.CompanyName, company.LogoDataUrl, "Company")
-                : ("Company", null, "Company");
-        }
-
-        return (targetUser.Email, null, targetUser.Role.ToString());
+        var batch = await ResolveSupportTargetDisplayBatchAsync([supportTargetUserId]);
+        return batch.TryGetValue(supportTargetUserId, out var display)
+            ? display
+            : ("User", null, "User");
     }
 
     private async Task NotifyAdminSupportRecipientsAsync(
