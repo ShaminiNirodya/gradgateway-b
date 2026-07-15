@@ -181,6 +181,7 @@ builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<ISupportInquiryService, SupportInquiryService>();
 builder.Services.AddScoped<ITestimonialService, TestimonialService>();
 builder.Services.AddScoped<IPlatformContentService, PlatformContentService>();
+builder.Services.AddScoped<IAcademicCatalogService, AcademicCatalogService>();
 builder.Services.AddSingleton<IRealtimeNotificationService>(sp =>
 {
     var hubContext = sp.GetRequiredService<IHubContext<GradGateway.Api.Hubs.ChatHub>>();
@@ -218,6 +219,7 @@ using (var scope = app.Services.CreateScope())
     var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseSeeder");
     dbContext.Database.Migrate();
     await GradGateway.Data.Seeding.PlatformContentSeeder.SeedAsync(dbContext, logger);
+    await GradGateway.Data.Seeding.AcademicCatalogSeeder.SeedAsync(dbContext, logger);
 }
 
 // Configure the HTTP request pipeline.

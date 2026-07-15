@@ -13,15 +13,18 @@ public class PlatformController : ControllerBase
     private readonly IAdminService _adminService;
     private readonly ITestimonialService _testimonialService;
     private readonly IPlatformContentService _platformContentService;
+    private readonly IAcademicCatalogService _academicCatalogService;
 
     public PlatformController(
         IAdminService adminService,
         ITestimonialService testimonialService,
-        IPlatformContentService platformContentService)
+        IPlatformContentService platformContentService,
+        IAcademicCatalogService academicCatalogService)
     {
         _adminService = adminService;
         _testimonialService = testimonialService;
         _platformContentService = platformContentService;
+        _academicCatalogService = academicCatalogService;
     }
 
     /// <summary>Registration and maintenance flags for anonymous clients (login/register pages).</summary>
@@ -59,5 +62,14 @@ public class PlatformController : ControllerBase
     {
         var items = await _platformContentService.GetPublishedAsync(contentType, section, audience, slug);
         return Ok(items);
+    }
+
+    /// <summary>Active universities and degrees for registration and search filters.</summary>
+    [HttpGet("academic-catalog")]
+    [AllowAnonymous]
+    [ResponseCache(Duration = 120, Location = ResponseCacheLocation.Any)]
+    public async Task<ActionResult<PublicAcademicCatalogDto>> GetAcademicCatalog()
+    {
+        return Ok(await _academicCatalogService.GetPublicCatalogAsync());
     }
 }

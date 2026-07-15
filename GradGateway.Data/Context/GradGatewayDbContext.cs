@@ -29,6 +29,9 @@ public class GradGatewayDbContext : DbContext
     public DbSet<SupportInquiry> SupportInquiries { get; set; }
     public DbSet<Testimonial> Testimonials { get; set; }
     public DbSet<PlatformContent> PlatformContents { get; set; }
+    public DbSet<CatalogUniversity> CatalogUniversities { get; set; }
+    public DbSet<CatalogDegree> CatalogDegrees { get; set; }
+    public DbSet<CatalogUniversityDegree> CatalogUniversityDegrees { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -536,6 +539,33 @@ public class GradGatewayDbContext : DbContext
             entity.HasOne(p => p.StudentProfile)
                 .WithMany()
                 .HasForeignKey(p => p.StudentProfileId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CatalogUniversity>(entity =>
+        {
+            entity.Property(u => u.Name).HasMaxLength(200).IsRequired();
+            entity.HasIndex(u => u.Name).IsUnique();
+            entity.HasIndex(u => new { u.IsActive, u.SortOrder });
+        });
+
+        modelBuilder.Entity<CatalogDegree>(entity =>
+        {
+            entity.Property(d => d.Name).HasMaxLength(200).IsRequired();
+            entity.HasIndex(d => d.Name).IsUnique();
+            entity.HasIndex(d => new { d.IsActive, d.SortOrder });
+        });
+
+        modelBuilder.Entity<CatalogUniversityDegree>(entity =>
+        {
+            entity.HasKey(o => new { o.UniversityId, o.DegreeId });
+            entity.HasOne(o => o.University)
+                .WithMany(u => u.Offerings)
+                .HasForeignKey(o => o.UniversityId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(o => o.Degree)
+                .WithMany(d => d.Offerings)
+                .HasForeignKey(o => o.DegreeId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

@@ -14,6 +14,7 @@ public class AdminController : ControllerBase
     private readonly IAdminService _adminService;
     private readonly ITestimonialService _testimonialService;
     private readonly IPlatformContentService _platformContentService;
+    private readonly IAcademicCatalogService _academicCatalogService;
     private readonly ILogger<AdminController> _logger;
     private readonly IHostEnvironment _environment;
 
@@ -21,12 +22,14 @@ public class AdminController : ControllerBase
         IAdminService adminService,
         ITestimonialService testimonialService,
         IPlatformContentService platformContentService,
+        IAcademicCatalogService academicCatalogService,
         ILogger<AdminController> logger,
         IHostEnvironment environment)
     {
         _adminService = adminService;
         _testimonialService = testimonialService;
         _platformContentService = platformContentService;
+        _academicCatalogService = academicCatalogService;
         _logger = logger;
         _environment = environment;
     }
@@ -283,6 +286,164 @@ public class AdminController : ControllerBase
         {
             await _platformContentService.DeleteAsync(contentId);
             return Ok(new { message = "Content deleted." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("academic-catalog/universities")]
+    public async Task<IActionResult> GetCatalogUniversities([FromQuery] bool includeHidden = true)
+    {
+        return Ok(await _academicCatalogService.GetAdminUniversitiesAsync(includeHidden));
+    }
+
+    [HttpGet("academic-catalog/universities/{universityId:guid}")]
+    public async Task<IActionResult> GetCatalogUniversity(Guid universityId)
+    {
+        var item = await _academicCatalogService.GetAdminUniversityAsync(universityId);
+        return item == null ? NotFound(new { message = "University not found." }) : Ok(item);
+    }
+
+    [HttpPost("academic-catalog/universities")]
+    public async Task<IActionResult> CreateCatalogUniversity([FromBody] UpsertCatalogUniversityDto dto)
+    {
+        try
+        {
+            return Ok(await _academicCatalogService.CreateUniversityAsync(dto));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("academic-catalog/universities/{universityId:guid}")]
+    public async Task<IActionResult> UpdateCatalogUniversity(Guid universityId, [FromBody] UpsertCatalogUniversityDto dto)
+    {
+        try
+        {
+            return Ok(await _academicCatalogService.UpdateUniversityAsync(universityId, dto));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPatch("academic-catalog/universities/{universityId:guid}/active")]
+    public async Task<IActionResult> SetCatalogUniversityActive(
+        Guid universityId,
+        [FromBody] SetCatalogUniversityActiveDto dto)
+    {
+        try
+        {
+            return Ok(await _academicCatalogService.SetUniversityActiveAsync(universityId, dto.IsActive));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("academic-catalog/universities/{universityId:guid}/degrees")]
+    public async Task<IActionResult> SetCatalogUniversityDegrees(
+        Guid universityId,
+        [FromBody] SetCatalogUniversityDegreesDto dto)
+    {
+        try
+        {
+            return Ok(await _academicCatalogService.SetUniversityDegreesAsync(universityId, dto));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("academic-catalog/universities/{universityId:guid}")]
+    public async Task<IActionResult> DeleteCatalogUniversity(Guid universityId)
+    {
+        try
+        {
+            await _academicCatalogService.DeleteUniversityAsync(universityId);
+            return Ok(new { message = "University deleted." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("academic-catalog/degrees")]
+    public async Task<IActionResult> GetCatalogDegrees([FromQuery] bool includeHidden = true)
+    {
+        return Ok(await _academicCatalogService.GetAdminDegreesAsync(includeHidden));
+    }
+
+    [HttpPost("academic-catalog/degrees")]
+    public async Task<IActionResult> CreateCatalogDegree([FromBody] UpsertCatalogDegreeDto dto)
+    {
+        try
+        {
+            return Ok(await _academicCatalogService.CreateDegreeAsync(dto));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("academic-catalog/degrees/{degreeId:guid}")]
+    public async Task<IActionResult> UpdateCatalogDegree(Guid degreeId, [FromBody] UpsertCatalogDegreeDto dto)
+    {
+        try
+        {
+            return Ok(await _academicCatalogService.UpdateDegreeAsync(degreeId, dto));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPatch("academic-catalog/degrees/{degreeId:guid}/active")]
+    public async Task<IActionResult> SetCatalogDegreeActive(Guid degreeId, [FromBody] SetCatalogDegreeActiveDto dto)
+    {
+        try
+        {
+            return Ok(await _academicCatalogService.SetDegreeActiveAsync(degreeId, dto.IsActive));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("academic-catalog/degrees/{degreeId:guid}")]
+    public async Task<IActionResult> DeleteCatalogDegree(Guid degreeId)
+    {
+        try
+        {
+            await _academicCatalogService.DeleteDegreeAsync(degreeId);
+            return Ok(new { message = "Degree deleted." });
         }
         catch (InvalidOperationException ex)
         {

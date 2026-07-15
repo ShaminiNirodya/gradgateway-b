@@ -115,7 +115,7 @@ public class AdminService : IAdminService
 
         var applicationRows = await _context.Applications
             .AsNoTracking()
-            .Select(a => new { a.Status, a.AppliedAt })
+            .Select(a => new { a.StudentProfileId, a.Status, a.AppliedAt })
             .ToListAsync();
 
         var applicationsByWeek = Enumerable.Range(0, 8)
@@ -146,6 +146,58 @@ public class AdminService : IAdminService
             .Take(6)
             .ToListAsync();
 
+        var studentProfiles = await _context.StudentProfiles
+            .AsNoTracking()
+            .Select(s => new { s.Id, s.University, s.Degree })
+            .ToListAsync();
+
+        var studentBreakdownByUniversity = studentProfiles
+            .Where(s => !string.IsNullOrWhiteSpace(s.University))
+            .GroupBy(s => s.University.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(g =>
+            {
+                var studentIds = g.Select(s => s.Id).ToHashSet();
+                var universityApplications = applicationRows
+                    .Where(a => studentIds.Contains(a.StudentProfileId))
+                    .ToList();
+                var universityTotalApplications = universityApplications.Count;
+                var universityHiredApplications = universityApplications.Count(a => a.Status == ApplicationStatus.Hired);
+
+                var degrees = g
+                    .Where(s => !string.IsNullOrWhiteSpace(s.Degree))
+                    .GroupBy(s => s.Degree.Trim(), StringComparer.OrdinalIgnoreCase)
+                    .Select(dg =>
+                    {
+                        var degreeStudentIds = dg.Select(s => s.Id).ToHashSet();
+                        var degreeApplications = applicationRows
+                            .Where(a => degreeStudentIds.Contains(a.StudentProfileId))
+                            .ToList();
+                        var degreeTotalApplications = degreeApplications.Count;
+                        var degreeHiredApplications = degreeApplications.Count(a => a.Status == ApplicationStatus.Hired);
+
+                        return new DegreeStudentAnalyticsDto(
+                            dg.Key,
+                            dg.Count(),
+                            degreeTotalApplications == 0
+                                ? 0m
+                                : Math.Round((decimal)degreeHiredApplications / degreeTotalApplications * 100m, 2));
+                    })
+                    .OrderByDescending(d => d.StudentCount)
+                    .ThenBy(d => d.Degree, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                return new UniversityStudentAnalyticsDto(
+                    g.Key,
+                    g.Count(),
+                    universityTotalApplications == 0
+                        ? 0m
+                        : Math.Round((decimal)universityHiredApplications / universityTotalApplications * 100m, 2),
+                    degrees);
+            })
+            .OrderByDescending(u => u.StudentCount)
+            .ThenBy(u => u.University, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
         var pendingTestimonials = await _context.Testimonials.CountAsync(t => t.Status == "Pending");
         var publishedTestimonials = await _context.Testimonials.CountAsync(t => t.Status == "Published");
 
@@ -163,7 +215,8 @@ public class AdminService : IAdminService
             signupsByWeek,
             applicationsByWeek,
             applicationsByStatus,
-            topIndustries);
+            topIndustries,
+            studentBreakdownByUniversity);
     }
 
     public async Task<PagedResultDto<AdminUserListItemDto>> GetUsersAsync(

@@ -1,0 +1,13 @@
+namespace GradGateway.Data.Entities;
+
+public class CatalogUniversity
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public bool IsActive { get; set; } = true;
+    public int SortOrder { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    public ICollection<CatalogUniversityDegree> Offerings { get; set; } = new List<CatalogUniversityDegree>();
+}
