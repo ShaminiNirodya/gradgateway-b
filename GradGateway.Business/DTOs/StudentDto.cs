@@ -10,12 +10,18 @@ public record StudentRegistrationDto(
     string? StudentId,
     string Degree,
     string GradYear,
+    int CurrentYear,
     string Gpa,
+    string? FieldOfMajor = null,
+    string? Availability = "Available Now",
     IReadOnlyList<string>? Certifications = null,
-    IReadOnlyList<string>? Awards = null
+    IReadOnlyList<string>? Awards = null,
+    IReadOnlyList<string>? HackathonsCompetitions = null,
+    string? CvUrl = null
 );
 
 public record StudentProfileResponseDto(
+    Guid StudentProfileId,
     string Email,
     string FirebaseUid,
     string FullName,
@@ -24,10 +30,41 @@ public record StudentProfileResponseDto(
     string University,
     string StudentId,
     string Degree,
+    string FieldOfMajor,
     int GradYear,
+    int CurrentYear,
     decimal Gpa,
+    string Availability,
     IReadOnlyList<string> Certifications,
-    IReadOnlyList<string> Awards
+    IReadOnlyList<string> Awards,
+    IReadOnlyList<string> HackathonsCompetitions,
+    string? CvUrl = null
+);
+
+public record StudentSkillDto(
+    Guid Id,
+    string Name,
+    string Category,
+    string ProficiencyLevel
+);
+
+public record AddStudentSkillDto(
+    string Name,
+    string? Category = null,
+    string? ProficiencyLevel = null
+);
+
+public record StudentInterviewDto(
+    Guid Id,
+    DateTime ScheduledAt,
+    string Mode,
+    string? MeetingLink,
+    string? Location,
+    string Status,
+    string? Notes,
+    string JobTitle,
+    string CompanyName,
+    string? CompanyLogoUrl
 );
 
 public record StudentDirectoryItemDto(
@@ -35,8 +72,26 @@ public record StudentDirectoryItemDto(
     string FullName,
     string University,
     string Degree,
+    string FieldOfMajor,
     int GradYear,
+    int CurrentYear,
     decimal Gpa,
     string Email,
-    string Skills
+    string Skills,
+    string? PhotoDataUrl,
+    string Availability,
+    string? CvUrl = null
 );
+
+public record StudentDirectorySearchRequest(
+    string? Query = null,
+    string? Universities = null,
+    string? Degrees = null,
+    int? GradYear = null,
+    decimal? GpaMin = null,
+    decimal? GpaMax = null,
+    string? Skills = null,
+    string? Availability = null,
+    string? Sort = null,
+    int Page = 1,
+    int PageSize = Pagination.DefaultPageSize);

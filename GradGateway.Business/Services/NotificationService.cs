@@ -30,7 +30,11 @@ public class NotificationService : INotificationService
             n.Title,
             n.Body,
             n.IsRead,
-            n.CreatedAt
+            n.CreatedAt,
+            n.RelatedOpportunityId,
+            n.RelatedApplicationId,
+            n.RelatedConversationId,
+            n.RelatedStudentProfileId
         )).ToList();
     }
 

@@ -67,13 +67,18 @@ public class StudentService : IStudentService
                 FullName = dto.FullName,
                 Phone = dto.Phone,
                 PhotoDataUrl = dto.PhotoDataUrl,
+                CvUrl = NormalizeCvUrl(dto.CvUrl),
                 University = dto.University,
                 StudentId = ResolveStudentId(dto.StudentId, user.Id),
                 Degree = dto.Degree,
+                FieldOfMajor = dto.FieldOfMajor ?? string.Empty,
                 GradYear = gradYear,
+                CurrentYear = dto.CurrentYear,
                 Gpa = gpa,
+                Availability = dto.Availability ?? "Available Now",
                 CertificationsJson = SerializeStringList(dto.Certifications),
                 AwardsJson = SerializeStringList(dto.Awards),
+                HackathonsCompetitionsJson = SerializeStringList(dto.HackathonsCompetitions),
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -84,13 +89,20 @@ public class StudentService : IStudentService
             profile.FullName = dto.FullName;
             profile.Phone = dto.Phone;
             profile.PhotoDataUrl = dto.PhotoDataUrl;
+            profile.CvUrl = NormalizeCvUrl(dto.CvUrl);
             profile.University = dto.University;
             profile.StudentId = string.IsNullOrWhiteSpace(dto.StudentId)
                 ? profile.StudentId
                 : dto.StudentId.Trim();
             profile.Degree = dto.Degree;
+            if (dto.FieldOfMajor != null)
+            {
+                profile.FieldOfMajor = dto.FieldOfMajor;
+            }
             profile.GradYear = gradYear;
+            profile.CurrentYear = dto.CurrentYear;
             profile.Gpa = gpa;
+            profile.Availability = dto.Availability ?? profile.Availability;
             if (dto.Certifications != null)
             {
                 profile.CertificationsJson = SerializeStringList(dto.Certifications);
@@ -98,6 +110,10 @@ public class StudentService : IStudentService
             if (dto.Awards != null)
             {
                 profile.AwardsJson = SerializeStringList(dto.Awards);
+            }
+            if (dto.HackathonsCompetitions != null)
+            {
+                profile.HackathonsCompetitionsJson = SerializeStringList(dto.HackathonsCompetitions);
             }
             profile.UpdatedAt = DateTime.UtcNow;
         }
@@ -112,6 +128,7 @@ public class StudentService : IStudentService
         }
 
         return new StudentProfileResponseDto(
+            profile.Id,
             user.Email,
             user.FirebaseUid,
             profile.FullName,
@@ -120,12 +137,20 @@ public class StudentService : IStudentService
             profile.University,
             profile.StudentId,
             profile.Degree,
+            profile.FieldOfMajor,
             profile.GradYear,
+            profile.CurrentYear,
             profile.Gpa,
+            profile.Availability,
             DeserializeStringList(profile.CertificationsJson),
-            DeserializeStringList(profile.AwardsJson)
+            DeserializeStringList(profile.AwardsJson),
+            DeserializeStringList(profile.HackathonsCompetitionsJson),
+            profile.CvUrl
         );
     }
+
+    private static string? NormalizeCvUrl(string? cvUrl) =>
+        string.IsNullOrWhiteSpace(cvUrl) ? null : cvUrl.Trim();
 
     private static string ResolveStudentId(string? requestedStudentId, Guid userId)
     {
@@ -170,6 +195,7 @@ public class StudentService : IStudentService
         await CleanupLegacyStudentDemoDataAsync(user, profile);
 
         return new StudentProfileResponseDto(
+            profile.Id,
             user.Email,
             user.FirebaseUid,
             profile.FullName,
@@ -178,10 +204,15 @@ public class StudentService : IStudentService
             profile.University,
             profile.StudentId,
             profile.Degree,
+            profile.FieldOfMajor,
             profile.GradYear,
+            profile.CurrentYear,
             profile.Gpa,
+            profile.Availability,
             DeserializeStringList(profile.CertificationsJson),
-            DeserializeStringList(profile.AwardsJson)
+            DeserializeStringList(profile.AwardsJson),
+            DeserializeStringList(profile.HackathonsCompetitionsJson),
+            profile.CvUrl
         );
     }
 
@@ -306,27 +337,169 @@ public class StudentService : IStudentService
 
     public async Task<List<StudentDirectoryItemDto>> GetStudentDirectoryAsync(string? query)
     {
-        var term = (query ?? string.Empty).Trim().ToLower();
+        var result = await SearchStudentDirectoryAsync(new StudentDirectorySearchRequest(
+            Query: query,
+            Page: 1,
+            PageSize: Pagination.MaxPageSize));
+        return result.Items.ToList();
+    }
 
-        var rows = await _context.StudentProfiles
+    public async Task<PagedResultDto<StudentDirectoryItemDto>> SearchStudentDirectoryAsync(StudentDirectorySearchRequest request)
+    {
+        var (page, pageSize) = Pagination.Normalize(request.Page, request.PageSize);
+        var term = (request.Query ?? string.Empty).Trim().ToLower();
+        var universities = ParseCsvList(request.Universities);
+        var degrees = ParseCsvList(request.Degrees);
+        var skills = ParseCsvList(request.Skills);
+        var availability = ParseCsvList(request.Availability);
+        var sort = (request.Sort ?? "Relevance").Trim();
+
+        var query = _context.StudentProfiles
+            .AsNoTracking()
             .Include(s => s.User)
-            .OrderByDescending(s => s.UpdatedAt)
+            .Where(s => s.User.IsActive);
+
+        if (universities.Count > 0)
+        {
+            query = query.Where(s => universities.Contains(s.University));
+        }
+
+        if (degrees.Count > 0)
+        {
+            query = query.Where(s => degrees.Contains(s.Degree));
+        }
+
+        if (request.GradYear is > 0)
+        {
+            query = query.Where(s => s.GradYear == request.GradYear.Value);
+        }
+
+        if (request.GpaMin is >= 0)
+        {
+            query = query.Where(s => s.Gpa >= request.GpaMin.Value);
+        }
+
+        if (request.GpaMax is >= 0)
+        {
+            query = query.Where(s => s.Gpa <= request.GpaMax.Value);
+        }
+
+        if (availability.Count > 0)
+        {
+            query = query.Where(s => availability.Contains(s.Availability));
+        }
+
+        if (!string.IsNullOrWhiteSpace(term))
+        {
+            query = query.Where(s =>
+                s.FullName.ToLower().Contains(term) ||
+                s.University.ToLower().Contains(term) ||
+                s.Degree.ToLower().Contains(term) ||
+                s.FieldOfMajor.ToLower().Contains(term));
+        }
+
+        foreach (var skill in skills)
+        {
+            var skillLower = skill.ToLower();
+            query = query.Where(s =>
+                _context.StudentSkills.Any(ss =>
+                    ss.StudentProfileId == s.Id &&
+                    ss.Skill.Name.ToLower() == skillLower) ||
+                _context.Projects.Any(p =>
+                    p.StudentProfileId == s.Id &&
+                    p.TechStack.ToLower().Contains(skillLower)));
+        }
+
+        query = sort switch
+        {
+            "GPA" => query.OrderByDescending(s => s.Gpa).ThenByDescending(s => s.UpdatedAt),
+            "Class" => query.OrderByDescending(s => s.GradYear).ThenByDescending(s => s.UpdatedAt),
+            _ => query.OrderByDescending(s => s.UpdatedAt),
+        };
+
+        var total = await query.CountAsync();
+        var rows = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
 
+        var items = await MapDirectoryItemsAsync(rows);
+
+        return new PagedResultDto<StudentDirectoryItemDto>(items, total, page, pageSize);
+    }
+
+    public async Task<StudentDirectoryItemDto?> GetStudentDirectoryItemByProfileIdAsync(Guid studentProfileId)
+    {
+        var profile = await _context.StudentProfiles
+            .AsNoTracking()
+            .Include(s => s.User)
+            .FirstOrDefaultAsync(s => s.Id == studentProfileId && s.User.IsActive);
+
+        if (profile == null)
+        {
+            return null;
+        }
+
+        var items = await MapDirectoryItemsAsync([profile]);
+        return items.FirstOrDefault();
+    }
+
+    private static List<string> ParseCsvList(string? raw) =>
+        string.IsNullOrWhiteSpace(raw)
+            ? []
+            : raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+    private async Task<List<StudentDirectoryItemDto>> MapDirectoryItemsAsync(IReadOnlyList<StudentProfile> rows)
+    {
+        if (rows.Count == 0)
+        {
+            return [];
+        }
+
         var profileIds = rows.Select(r => r.Id).ToList();
-        var skills = await _context.StudentSkills
+
+        var studentSkills = await _context.StudentSkills
+            .AsNoTracking()
             .Include(ss => ss.Skill)
             .Where(ss => profileIds.Contains(ss.StudentProfileId))
             .ToListAsync();
 
-        var skillMap = skills
-            .GroupBy(s => s.StudentProfileId)
-            .ToDictionary(
-                g => g.Key,
-                g => string.Join(", ", g.Select(x => x.Skill.Name).Distinct().OrderBy(x => x))
-            );
+        var projects = await _context.Projects
+            .AsNoTracking()
+            .Where(p => profileIds.Contains(p.StudentProfileId))
+            .Select(p => new { p.StudentProfileId, p.TechStack })
+            .ToListAsync();
 
-        var data = rows.Select(s =>
+        var skillMap = new Dictionary<Guid, string>();
+
+        foreach (var profileId in profileIds)
+        {
+            var skillSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var skill in studentSkills
+                         .Where(ss => ss.StudentProfileId == profileId)
+                         .Select(ss => ss.Skill.Name)
+                         .Where(name => !string.IsNullOrWhiteSpace(name)))
+            {
+                skillSet.Add(skill);
+            }
+
+            foreach (var skill in projects
+                         .Where(p => p.StudentProfileId == profileId && !string.IsNullOrWhiteSpace(p.TechStack))
+                         .SelectMany(p => p.TechStack.Split(','))
+                         .Select(s => s.Trim())
+                         .Where(s => !string.IsNullOrWhiteSpace(s)))
+            {
+                skillSet.Add(skill);
+            }
+
+            skillMap[profileId] = string.Join(", ", skillSet.OrderBy(s => s));
+        }
+
+        return rows.Select(s =>
         {
             var skillText = skillMap.TryGetValue(s.Id, out var value) ? value : string.Empty;
             return new StudentDirectoryItemDto(
@@ -334,26 +507,152 @@ public class StudentService : IStudentService
                 s.FullName,
                 s.University,
                 s.Degree,
+                s.FieldOfMajor,
                 s.GradYear,
+                s.CurrentYear,
                 s.Gpa,
                 s.User.Email,
-                skillText
-            );
-        });
+                skillText,
+                s.PhotoDataUrl,
+                s.Availability,
+                s.CvUrl);
+        }).ToList();
+    }
 
-        if (string.IsNullOrWhiteSpace(term))
+    public async Task<List<StudentSkillDto>> GetMySkillsAsync(string firebaseUid)
+    {
+        var profile = await GetOwnedStudentProfileAsync(firebaseUid);
+
+        var rows = await _context.StudentSkills
+            .AsNoTracking()
+            .Include(ss => ss.Skill)
+            .Where(ss => ss.StudentProfileId == profile.Id)
+            .OrderBy(ss => ss.Skill.Name)
+            .ToListAsync();
+
+        return rows
+            .Select(ss => new StudentSkillDto(
+                ss.Id,
+                ss.Skill.Name,
+                ss.Skill.Category,
+                ss.ProficiencyLevel.ToString()))
+            .ToList();
+    }
+
+    public async Task<StudentSkillDto> AddSkillAsync(string firebaseUid, AddStudentSkillDto dto)
+    {
+        var profile = await GetOwnedStudentProfileAsync(firebaseUid);
+
+        var name = (dto.Name ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(name))
         {
-            return data.ToList();
+            throw new ArgumentException("Skill name is required.");
+        }
+        if (name.Length > 60)
+        {
+            throw new ArgumentException("Skill name is too long.");
         }
 
-        return data
-            .Where(d =>
-                d.FullName.ToLower().Contains(term) ||
-                d.University.ToLower().Contains(term) ||
-                d.Degree.ToLower().Contains(term) ||
-                d.Skills.ToLower().Contains(term)
-            )
-            .ToList();
+        var level = SkillLevel.Intermediate;
+        if (!string.IsNullOrWhiteSpace(dto.ProficiencyLevel) &&
+            Enum.TryParse<SkillLevel>(dto.ProficiencyLevel, true, out var parsedLevel))
+        {
+            level = parsedLevel;
+        }
+
+        var skill = await _context.Skills.FirstOrDefaultAsync(s => s.Name.ToLower() == name.ToLower());
+        if (skill == null)
+        {
+            skill = new Skill
+            {
+                Id = Guid.NewGuid(),
+                Name = name,
+                Category = (dto.Category ?? "General").Trim()
+            };
+            _context.Skills.Add(skill);
+        }
+
+        var existing = await _context.StudentSkills
+            .FirstOrDefaultAsync(ss => ss.StudentProfileId == profile.Id && ss.SkillId == skill.Id);
+        if (existing != null)
+        {
+            throw new InvalidOperationException("You already have this skill on your profile.");
+        }
+
+        var studentSkill = new StudentSkill
+        {
+            Id = Guid.NewGuid(),
+            StudentProfileId = profile.Id,
+            SkillId = skill.Id,
+            ProficiencyLevel = level,
+            YearsOfExperience = 0
+        };
+        _context.StudentSkills.Add(studentSkill);
+        await _context.SaveChangesAsync();
+
+        return new StudentSkillDto(studentSkill.Id, skill.Name, skill.Category, level.ToString());
+    }
+
+    public async Task RemoveSkillAsync(string firebaseUid, Guid studentSkillId)
+    {
+        var profile = await GetOwnedStudentProfileAsync(firebaseUid);
+
+        var row = await _context.StudentSkills
+            .FirstOrDefaultAsync(ss => ss.Id == studentSkillId && ss.StudentProfileId == profile.Id);
+        if (row == null)
+        {
+            throw new InvalidOperationException("Skill not found on your profile.");
+        }
+
+        _context.StudentSkills.Remove(row);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<List<StudentInterviewDto>> GetMyInterviewsAsync(string firebaseUid)
+    {
+        var profile = await GetOwnedStudentProfileAsync(firebaseUid);
+
+        var rows = await _context.Interviews
+            .AsNoTracking()
+            .Include(i => i.Application)
+                .ThenInclude(a => a.Opportunity)
+                    .ThenInclude(o => o!.CompanyProfile)
+            .Include(i => i.Application)
+                .ThenInclude(a => a.CompanyProfile)
+            .Where(i => i.Application.StudentProfileId == profile.Id)
+            .OrderBy(i => i.ScheduledAt)
+            .ToListAsync();
+
+        return rows.Select(i =>
+        {
+            var application = i.Application;
+            var company = application.Opportunity?.CompanyProfile ?? application.CompanyProfile;
+            var jobTitle = application.Opportunity?.Title ?? application.JobTitle ?? "Direct offer";
+
+            return new StudentInterviewDto(
+                i.Id,
+                i.ScheduledAt,
+                i.Mode.ToString(),
+                i.MeetingLink,
+                i.Location,
+                i.Status.ToString(),
+                i.Notes,
+                jobTitle,
+                company?.CompanyName ?? "Company",
+                company?.LogoDataUrl);
+        }).ToList();
+    }
+
+    private async Task<StudentProfile> GetOwnedStudentProfileAsync(string firebaseUid)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid);
+        if (user == null || user.Role != UserRole.Student)
+        {
+            throw new InvalidOperationException("Only student users can perform this action.");
+        }
+
+        var profile = await _context.StudentProfiles.FirstOrDefaultAsync(p => p.UserId == user.Id);
+        return profile ?? throw new InvalidOperationException("Student profile not found.");
     }
 
     private async Task EnsureStudentDemoDataAsync(User studentUser, StudentProfile studentProfile)

@@ -11,10 +11,14 @@ namespace GradGateway.Api.Controllers;
 public class NotificationsController : ControllerBase
 {
     private readonly INotificationService _service;
+    private readonly IDeadlineNotificationProcessor _deadlineProcessor;
 
-    public NotificationsController(INotificationService service)
+    public NotificationsController(
+        INotificationService service,
+        IDeadlineNotificationProcessor deadlineProcessor)
     {
         _service = service;
+        _deadlineProcessor = deadlineProcessor;
     }
 
     [HttpGet("me")]
@@ -23,6 +27,7 @@ public class NotificationsController : ControllerBase
         var uid = GetFirebaseUid();
         if (string.IsNullOrWhiteSpace(uid)) return Unauthorized(new { message = "Invalid token" });
 
+        await _deadlineProcessor.ProcessExpiredOpportunityDeadlinesAsync();
         var data = await _service.GetMyNotificationsAsync(uid);
         return Ok(data);
     }

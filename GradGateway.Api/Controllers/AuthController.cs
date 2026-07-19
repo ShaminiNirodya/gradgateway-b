@@ -59,6 +59,10 @@ public class AuthController : ControllerBase
         {
             return BadRequest(new { message = ex.Message });
         }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(403, new { message = ex.Message });
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error syncing user");
@@ -91,6 +95,10 @@ public class AuthController : ControllerBase
             }
 
             return Ok(user);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(403, new { message = ex.Message });
         }
         catch (Exception ex)
         {
@@ -134,6 +142,105 @@ public class AuthController : ControllerBase
                 message = ex.Message,
                 timestamp = DateTime.UtcNow 
             });
+        }
+    }
+
+    /// <summary>
+    /// Request a password reset code to be sent to the user's email
+    /// </summary>
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequestDto dto)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(dto.Email))
+            {
+                return BadRequest(new { message = "Email is required" });
+            }
+
+            var result = await _userService.RequestPasswordResetAsync(dto.Email);
+            
+            _logger.LogInformation("Password reset requested for email: {Email}", dto.Email);
+
+            if (!result.Success)
+            {
+                return BadRequest(result);
+            }
+            
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing forgot password request");
+            return StatusCode(500, new { message = "An error occurred while processing your request" });
+        }
+    }
+
+    /// <summary>
+    /// Verify a password reset code
+    /// </summary>
+    [HttpPost("verify-reset-code")]
+    [AllowAnonymous]
+    public async Task<IActionResult> VerifyResetCode([FromBody] VerifyResetCodeRequestDto dto)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.Code))
+            {
+                return BadRequest(new { message = "Email and code are required" });
+            }
+
+            var result = await _userService.VerifyResetCodeAsync(dto.Email, dto.Code);
+            
+            if (result.Valid)
+            {
+                _logger.LogInformation("Password reset code verified for email: {Email}", dto.Email);
+                return Ok(result);
+            }
+
+            return BadRequest(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error verifying reset code");
+            return StatusCode(500, new { message = "An error occurred while verifying the reset code" });
+        }
+    }
+
+    /// <summary>
+    /// Reset password using verification code and update Firebase Auth password
+    /// </summary>
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequestDto dto)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.Code))
+            {
+                return BadRequest(new { message = "Email and code are required" });
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.NewPassword))
+            {
+                return BadRequest(new { message = "New password is required" });
+            }
+
+            var result = await _userService.ResetPasswordAsync(dto.Email, dto.Code, dto.NewPassword);
+            
+            if (result.Success)
+            {
+                _logger.LogInformation("Password reset successful for email: {Email}", dto.Email);
+                return Ok(result);
+            }
+
+            return BadRequest(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error resetting password");
+            return StatusCode(500, new { message = "An error occurred while resetting the password" });
         }
     }
 }

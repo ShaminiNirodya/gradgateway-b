@@ -9,21 +9,29 @@ public class GradGatewayDbContext : DbContext
     public GradGatewayDbContext(DbContextOptions<GradGatewayDbContext> options) : base(options) { }
 
     public DbSet<User> Users { get; set; }
+    public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
     public DbSet<StudentProfile> StudentProfiles { get; set; }
     public DbSet<CompanyProfile> CompanyProfiles { get; set; }
     public DbSet<Opportunity> Opportunities { get; set; }
     public DbSet<Application> Applications { get; set; }
-    public DbSet<SavedOpportunity> SavedOpportunities { get; set; }
     public DbSet<Conversation> Conversations { get; set; }
     public DbSet<Message> Messages { get; set; }
     public DbSet<Notification> Notifications { get; set; }
     public DbSet<Project> Projects { get; set; }
+    public DbSet<ProjectImage> ProjectImages { get; set; }
     public DbSet<Skill> Skills { get; set; }
     public DbSet<StudentSkill> StudentSkills { get; set; }
     public DbSet<Interview> Interviews { get; set; }
+    public DbSet<OpportunityInterviewPlan> OpportunityInterviewPlans { get; set; }
     public DbSet<Document> Documents { get; set; }
     public DbSet<EmailLog> EmailLogs { get; set; }
-    public DbSet<CompanyTeamMember> CompanyTeamMembers { get; set; }
+    public DbSet<PlatformSettings> PlatformSettings { get; set; }
+    public DbSet<SupportInquiry> SupportInquiries { get; set; }
+    public DbSet<Testimonial> Testimonials { get; set; }
+    public DbSet<PlatformContent> PlatformContents { get; set; }
+    public DbSet<CatalogUniversity> CatalogUniversities { get; set; }
+    public DbSet<CatalogDegree> CatalogDegrees { get; set; }
+    public DbSet<CatalogUniversityDegree> CatalogUniversityDegrees { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -66,9 +74,6 @@ public class GradGatewayDbContext : DbContext
         var applicationId2 = Guid.Parse("eeeeeeee-1111-2222-3333-555555555555");
         var applicationId3 = Guid.Parse("eeeeeeee-1111-2222-3333-666666666666");
 
-        var savedId1 = Guid.Parse("ffffffff-1111-2222-3333-444444444444");
-        var savedId2 = Guid.Parse("ffffffff-1111-2222-3333-555555555555");
-
         var conversationId1 = Guid.Parse("abababab-1111-2222-3333-444444444444");
         var conversationId2 = Guid.Parse("abababab-1111-2222-3333-555555555555");
 
@@ -102,6 +107,15 @@ public class GradGatewayDbContext : DbContext
         var documentId1 = Guid.Parse("b2b2b2b2-1111-2222-3333-444444444444");
         var documentId2 = Guid.Parse("b2b2b2b2-1111-2222-3333-555555555555");
         var documentId3 = Guid.Parse("b2b2b2b2-1111-2222-3333-666666666666");
+        var platformSettingsId = Guid.Parse("f0f0f0f0-1111-2222-3333-444444444444");
+
+        modelBuilder.Entity<PlatformSettings>().HasData(new PlatformSettings
+        {
+            Id = platformSettingsId,
+            AllowRegistration = true,
+            MaintenanceMode = false,
+            UpdatedAt = seedUpdatedAt
+        });
 
         // Seed users
         modelBuilder.Entity<User>().HasData(new User
@@ -110,6 +124,7 @@ public class GradGatewayDbContext : DbContext
             FirebaseUid = "CffvlJMXIlUM3FRQzNyu80hXBkU2", 
             Email = "admin@gradgateway.com",
             Role = UserRole.Admin,
+            IsActive = true,
             CreatedAt = seedCreatedAt
         },
         new User
@@ -118,6 +133,7 @@ public class GradGatewayDbContext : DbContext
             FirebaseUid = "demo-student-uid-001",
             Email = "student.demo@uom.lk",
             Role = UserRole.Student,
+            IsActive = true,
             CreatedAt = seedCreatedAt
         },
         new User
@@ -126,6 +142,7 @@ public class GradGatewayDbContext : DbContext
             FirebaseUid = "demo-student-uid-002",
             Email = "nethmi.perera@eng.pdn.ac.lk",
             Role = UserRole.Student,
+            IsActive = true,
             CreatedAt = seedCreatedAt
         },
         new User
@@ -134,6 +151,7 @@ public class GradGatewayDbContext : DbContext
             FirebaseUid = "demo-student-uid-003",
             Email = "sahan.jayasinghe@stu.cmb.ac.lk",
             Role = UserRole.Student,
+            IsActive = true,
             CreatedAt = seedCreatedAt
         },
         new User
@@ -142,6 +160,7 @@ public class GradGatewayDbContext : DbContext
             FirebaseUid = "demo-student-uid-004",
             Email = "tharushi.senanayake@jfn.ac.lk",
             Role = UserRole.Student,
+            IsActive = true,
             CreatedAt = seedCreatedAt
         },
         new User
@@ -150,6 +169,7 @@ public class GradGatewayDbContext : DbContext
             FirebaseUid = "demo-company-uid-001",
             Email = "company.demo@sample.lk",
             Role = UserRole.Company,
+            IsActive = true,
             CreatedAt = seedCreatedAt
         },
         new User
@@ -158,6 +178,7 @@ public class GradGatewayDbContext : DbContext
             FirebaseUid = "demo-company-uid-002",
             Email = "careers@dialog.lk",
             Role = UserRole.Company,
+            IsActive = true,
             CreatedAt = seedCreatedAt
         },
         new User
@@ -166,6 +187,7 @@ public class GradGatewayDbContext : DbContext
             FirebaseUid = "demo-company-uid-003",
             Email = "internships@wso2.com",
             Role = UserRole.Company,
+            IsActive = true,
             CreatedAt = seedCreatedAt
         },
         new User
@@ -174,6 +196,7 @@ public class GradGatewayDbContext : DbContext
             FirebaseUid = "demo-company-uid-004",
             Email = "hr@virtusa.com",
             Role = UserRole.Company,
+            IsActive = true,
             CreatedAt = seedCreatedAt
         });
 
@@ -204,6 +227,13 @@ public class GradGatewayDbContext : DbContext
         {
             entity.HasIndex(p => p.StudentId).IsUnique();
             entity.HasIndex(p => p.UserId).IsUnique();
+            entity.HasIndex(p => p.UpdatedAt);
+            entity.HasIndex(p => p.University);
+            entity.HasIndex(p => p.GradYear);
+            entity.HasIndex(p => p.Gpa);
+
+            entity.Property(p => p.University).HasMaxLength(200);
+            entity.Property(p => p.Degree).HasMaxLength(200);
 
             entity.HasOne(p => p.User)
                 .WithMany()
@@ -283,28 +313,6 @@ public class GradGatewayDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<CompanyTeamMember>(entity =>
-        {
-            entity.HasIndex(m => new { m.CompanyProfileId, m.Email }).IsUnique();
-            entity.HasIndex(m => m.InvitationToken).IsUnique();
-
-            entity.Property(m => m.Name).HasMaxLength(120);
-            entity.Property(m => m.Email).HasMaxLength(320);
-            entity.Property(m => m.Role).HasMaxLength(80);
-            entity.Property(m => m.Status).HasMaxLength(24);
-            entity.Property(m => m.InvitationToken).HasMaxLength(200);
-
-            entity.HasOne(m => m.CompanyProfile)
-                .WithMany()
-                .HasForeignKey(m => m.CompanyProfileId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(m => m.InvitedByUser)
-                .WithMany()
-                .HasForeignKey(m => m.InvitedByUserId)
-                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<CompanyProfile>().HasData(new CompanyProfile
@@ -394,7 +402,10 @@ public class GradGatewayDbContext : DbContext
         {
             entity.HasIndex(p => p.OpportunityId);
             entity.HasIndex(p => p.StudentProfileId);
-            entity.HasIndex(p => new { p.OpportunityId, p.StudentProfileId }).IsUnique();
+            entity.HasIndex(p => p.AppliedAt);
+            entity.HasIndex(p => new { p.OpportunityId, p.StudentProfileId })
+                .IsUnique()
+                .HasFilter("[OpportunityId] IS NOT NULL");
 
             entity.HasOne(p => p.Opportunity)
                 .WithMany()
@@ -407,25 +418,11 @@ public class GradGatewayDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        modelBuilder.Entity<SavedOpportunity>(entity =>
-        {
-            entity.HasIndex(p => p.StudentProfileId);
-            entity.HasIndex(p => p.OpportunityId);
-            entity.HasIndex(p => new { p.StudentProfileId, p.OpportunityId }).IsUnique();
-
-            entity.HasOne(p => p.StudentProfile)
-                .WithMany()
-                .HasForeignKey(p => p.StudentProfileId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasOne(p => p.Opportunity)
-                .WithMany()
-                .HasForeignKey(p => p.OpportunityId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
         modelBuilder.Entity<Conversation>(entity =>
         {
+            entity.Property(p => p.Kind).HasMaxLength(20).HasDefaultValue("StudentCompany");
+            entity.HasIndex(p => p.Kind);
+            entity.HasIndex(p => p.SupportTargetUserId);
             entity.HasIndex(p => p.StudentProfileId);
             entity.HasIndex(p => p.CompanyProfileId);
             entity.HasIndex(p => p.OpportunityId);
@@ -443,6 +440,11 @@ public class GradGatewayDbContext : DbContext
             entity.HasOne(p => p.Opportunity)
                 .WithMany()
                 .HasForeignKey(p => p.OpportunityId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(p => p.SupportTargetUser)
+                .WithMany()
+                .HasForeignKey(p => p.SupportTargetUserId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -508,6 +510,16 @@ public class GradGatewayDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<OpportunityInterviewPlan>(entity =>
+        {
+            entity.HasIndex(p => p.OpportunityId).IsUnique();
+
+            entity.HasOne(p => p.Opportunity)
+                .WithMany()
+                .HasForeignKey(p => p.OpportunityId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<Interview>(entity =>
         {
             entity.HasIndex(p => p.ApplicationId).IsUnique();
@@ -528,6 +540,48 @@ public class GradGatewayDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(p => p.StudentProfileId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CatalogUniversity>(entity =>
+        {
+            entity.Property(u => u.Name).HasMaxLength(200).IsRequired();
+            entity.HasIndex(u => u.Name).IsUnique();
+            entity.HasIndex(u => new { u.IsActive, u.SortOrder });
+        });
+
+        modelBuilder.Entity<CatalogDegree>(entity =>
+        {
+            entity.Property(d => d.Name).HasMaxLength(200).IsRequired();
+            entity.HasIndex(d => d.Name).IsUnique();
+            entity.HasIndex(d => new { d.IsActive, d.SortOrder });
+        });
+
+        modelBuilder.Entity<CatalogUniversityDegree>(entity =>
+        {
+            entity.HasKey(o => new { o.UniversityId, o.DegreeId });
+            entity.HasOne(o => o.University)
+                .WithMany(u => u.Offerings)
+                .HasForeignKey(o => o.UniversityId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(o => o.Degree)
+                .WithMany(d => d.Offerings)
+                .HasForeignKey(o => o.DegreeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PlatformContent>(entity =>
+        {
+            entity.Property(e => e.ContentType).HasMaxLength(20);
+            entity.Property(e => e.Section).HasMaxLength(20);
+            entity.Property(e => e.Title).HasMaxLength(300);
+            entity.Property(e => e.Audiences).HasMaxLength(100);
+            entity.Property(e => e.Category).HasMaxLength(120);
+            entity.Property(e => e.Slug).HasMaxLength(120);
+            entity.Property(e => e.Status).HasMaxLength(20);
+            entity.Property(e => e.RelatedLinkHref).HasMaxLength(500);
+            entity.Property(e => e.RelatedLinkLabel).HasMaxLength(200);
+            entity.HasIndex(e => new { e.ContentType, e.Section, e.Status });
+            entity.HasIndex(e => e.SortOrder);
         });
 
         modelBuilder.Entity<Opportunity>().HasData(
@@ -630,27 +684,11 @@ public class GradGatewayDbContext : DbContext
             }
         );
 
-        modelBuilder.Entity<SavedOpportunity>().HasData(
-            new SavedOpportunity
-            {
-                Id = savedId1,
-                StudentProfileId = studentProfileId,
-                OpportunityId = opportunityId2,
-                SavedAt = seedCreatedAt
-            },
-            new SavedOpportunity
-            {
-                Id = savedId2,
-                StudentProfileId = studentProfileId4,
-                OpportunityId = opportunityId4,
-                SavedAt = seedCreatedAt
-            }
-        );
-
         modelBuilder.Entity<Conversation>().HasData(
             new Conversation
             {
                 Id = conversationId1,
+                Kind = "StudentCompany",
                 StudentProfileId = studentProfileId,
                 CompanyProfileId = companyProfileId,
                 OpportunityId = opportunityId1,
@@ -660,6 +698,7 @@ public class GradGatewayDbContext : DbContext
             new Conversation
             {
                 Id = conversationId2,
+                Kind = "StudentCompany",
                 StudentProfileId = studentProfileId2,
                 CompanyProfileId = companyProfileId2,
                 OpportunityId = opportunityId2,

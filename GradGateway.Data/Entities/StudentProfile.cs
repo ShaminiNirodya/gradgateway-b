@@ -9,14 +9,20 @@ public class StudentProfile
     public string FullName { get; set; } = string.Empty;
     public string Phone { get; set; } = string.Empty;
     public string? PhotoDataUrl { get; set; }
+    /// <summary>Firebase Storage download URL for the student's CV (PDF/DOC).</summary>
+    public string? CvUrl { get; set; }
 
     public string University { get; set; } = string.Empty;
     public string StudentId { get; set; } = string.Empty;
     public string Degree { get; set; } = string.Empty;
+    public string FieldOfMajor { get; set; } = string.Empty;
     public int GradYear { get; set; }
+    public int CurrentYear { get; set; } // 1=1st Year, 2=2nd Year, 3=3rd Year, 4=4th Year, etc.
     public decimal Gpa { get; set; }
+    public string Availability { get; set; } = "Available Now"; // Available Now, Actively Looking, Open to Offers, Not Looking
     public string? CertificationsJson { get; set; }
     public string? AwardsJson { get; set; }
+    public string? HackathonsCompetitionsJson { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

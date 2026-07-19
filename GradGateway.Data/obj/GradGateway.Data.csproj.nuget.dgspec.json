@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "D:\\University App\\GradGateway\\GradGateway.Data\\GradGateway.Data.csproj": {}
+    "D:\\University App\\gradgateway-b\\GradGateway.Data\\GradGateway.Data.csproj": {}
   },
   "projects": {
-    "D:\\University App\\GradGateway\\GradGateway.Data\\GradGateway.Data.csproj": {
+    "D:\\University App\\gradgateway-b\\GradGateway.Data\\GradGateway.Data.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\University App\\GradGateway\\GradGateway.Data\\GradGateway.Data.csproj",
+        "projectUniqueName": "D:\\University App\\gradgateway-b\\GradGateway.Data\\GradGateway.Data.csproj",
         "projectName": "GradGateway.Data",
-        "projectPath": "D:\\University App\\GradGateway\\GradGateway.Data\\GradGateway.Data.csproj",
+        "projectPath": "D:\\University App\\gradgateway-b\\GradGateway.Data\\GradGateway.Data.csproj",
         "packagesPath": "C:\\Users\\DELL\\.nuget\\packages\\",
-        "outputPath": "D:\\University App\\GradGateway\\GradGateway.Data\\obj\\",
+        "outputPath": "D:\\University App\\gradgateway-b\\GradGateway.Data\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -62,6 +62,14 @@
               "version": "[9.0.0, )"
             },
             "Microsoft.EntityFrameworkCore.SqlServer": {
+              "target": "Package",
+              "version": "[9.0.0, )"
+            },
+            "Microsoft.Extensions.Configuration.EnvironmentVariables": {
+              "target": "Package",
+              "version": "[9.0.0, )"
+            },
+            "Microsoft.Extensions.Configuration.Json": {
               "target": "Package",
               "version": "[9.0.0, )"
             }

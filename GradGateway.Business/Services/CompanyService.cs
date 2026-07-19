@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using GradGateway.Business.DTOs;
+using GradGateway.Business.Helpers;
 using GradGateway.Business.Interfaces;
 using GradGateway.Data.Context;
 using GradGateway.Data.Entities;
@@ -77,20 +78,7 @@ public class CompanyService : ICompanyService
 
         await _context.SaveChangesAsync();
 
-        return new CompanyProfileResponseDto(
-            user.Email,
-            user.FirebaseUid,
-            profile.CompanyName,
-            profile.CompanyEmail,
-            profile.Phone,
-            profile.Website,
-            profile.Industry,
-            profile.LogoDataUrl,
-            profile.RecruiterName,
-            profile.RecruiterEmail,
-            profile.RecruiterPhone,
-            profile.Position
-        );
+        return ToProfileDto(user, profile);
     }
 
     public async Task<CompanyProfileResponseDto?> GetCompanyByFirebaseUidAsync(string firebaseUid)
@@ -101,7 +89,51 @@ public class CompanyService : ICompanyService
         var profile = await _context.CompanyProfiles.FirstOrDefaultAsync(p => p.UserId == user.Id);
         if (profile == null) return null;
 
-        return new CompanyProfileResponseDto(
+        return ToProfileDto(user, profile);
+    }
+
+    public async Task<CompanyPublicProfileDto?> GetPublicCompanyProfileAsync(Guid companyProfileId)
+    {
+        var profile = await _context.CompanyProfiles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == companyProfileId);
+
+        if (profile == null)
+            return null;
+
+        var openings = await _context.Opportunities
+            .AsNoTracking()
+            .Where(o => o.CompanyProfileId == companyProfileId && o.IsActive)
+            .OrderByDescending(o => o.CreatedAt)
+            .Select(o => new CompanyPublicOpeningDto(
+                o.Id,
+                o.Title,
+                o.Location,
+                o.OpportunityType.ToString(),
+                o.WorkMode.ToString(),
+                o.DeadlineAt,
+                o.MonthlyStipendLkr,
+                o.CreatedAt))
+            .ToListAsync();
+
+        return new CompanyPublicProfileDto(
+            profile.Id,
+            profile.CompanyName,
+            profile.CompanyEmail,
+            profile.Phone,
+            profile.Website,
+            profile.Industry,
+            profile.LogoDataUrl,
+            profile.RecruiterName,
+            profile.RecruiterEmail,
+            profile.RecruiterPhone,
+            profile.Position,
+            openings.Count,
+            openings);
+    }
+
+    private static CompanyProfileResponseDto ToProfileDto(User user, CompanyProfile profile) =>
+        new(
             user.Email,
             user.FirebaseUid,
             profile.CompanyName,
@@ -113,7 +145,5 @@ public class CompanyService : ICompanyService
             profile.RecruiterName,
             profile.RecruiterEmail,
             profile.RecruiterPhone,
-            profile.Position
-        );
-    }
+            profile.Position);
 }

@@ -2,6 +2,7 @@ using GradGateway.Business.DTOs;
 using GradGateway.Business.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
 namespace GradGateway.Api.Controllers;
@@ -40,14 +41,14 @@ public class ApplicationsController : ControllerBase
     }
 
     [HttpGet("student/me")]
-    public async Task<IActionResult> GetStudentMine()
+    public async Task<IActionResult> GetStudentMine([FromQuery] int page = 1, [FromQuery] int pageSize = 50)
     {
         var uid = GetFirebaseUid();
         if (string.IsNullOrWhiteSpace(uid)) return Unauthorized(new { message = "Invalid token" });
 
         try
         {
-            var result = await _service.GetStudentApplicationsAsync(uid);
+            var result = await _service.GetStudentApplicationsAsync(uid, page, pageSize);
             return Ok(result);
         }
         catch (InvalidOperationException ex)
@@ -56,16 +57,49 @@ public class ApplicationsController : ControllerBase
         }
     }
 
-    [HttpGet("company/me")]
-    public async Task<IActionResult> GetCompanyMine()
+    [HttpPost("student/sync-offer-replies")]
+    public async Task<IActionResult> SyncStudentOfferReplies()
     {
         var uid = GetFirebaseUid();
         if (string.IsNullOrWhiteSpace(uid)) return Unauthorized(new { message = "Invalid token" });
 
         try
         {
-            var result = await _service.GetCompanyApplicationsAsync(uid);
+            var updated = await _service.SyncDirectOfferStatusesFromMessagesAsync(uid);
+            return Ok(new { updated });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("company/me")]
+    public async Task<IActionResult> GetCompanyMine([FromQuery] int page = 1, [FromQuery] int pageSize = 50)
+    {
+        var uid = GetFirebaseUid();
+        if (string.IsNullOrWhiteSpace(uid)) return Unauthorized(new { message = "Invalid token" });
+
+        try
+        {
+            var result = await _service.GetCompanyApplicationsAsync(uid, page, pageSize);
             return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("company/analytics")]
+    public async Task<IActionResult> GetCompanyAnalytics()
+    {
+        var uid = GetFirebaseUid();
+        if (string.IsNullOrWhiteSpace(uid)) return Unauthorized(new { message = "Invalid token" });
+
+        try
+        {
+            return Ok(await _service.GetCompanyAnalyticsAsync(uid));
         }
         catch (InvalidOperationException ex)
         {
@@ -91,6 +125,70 @@ public class ApplicationsController : ControllerBase
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("conversation/{conversationId:guid}/offer-response")]
+    public async Task<IActionResult> RespondToJobOffer(
+        Guid conversationId,
+        [FromBody] RespondToJobOfferRequestDto dto)
+    {
+        var uid = GetFirebaseUid();
+        if (string.IsNullOrWhiteSpace(uid)) return Unauthorized(new { message = "Invalid token" });
+
+        try
+        {
+            var result = await _service.RespondToJobOfferAsync(uid, conversationId, dto.Accepted, dto.ApplicationId);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("job-offer")]
+    public async Task<IActionResult> CreateJobOffer([FromBody] CreateJobOfferRequestDto dto)
+    {
+        var uid = GetFirebaseUid();
+        if (string.IsNullOrWhiteSpace(uid)) return Unauthorized(new { message = "Invalid token" });
+
+        try
+        {
+            var result = await _service.CreateJobOfferApplicationAsync(
+                uid,
+                dto.StudentProfileId,
+                dto.JobTitle,
+                dto.JobType,
+                dto.Compensation,
+                dto.ProposalMessage,
+                dto.OpportunityId
+            );
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (DbUpdateException ex)
+        {
+            return StatusCode(500, new
+            {
+                message = "Could not save the job offer. Run database migrations (AddDirectJobOfferFields) or contact support.",
+                detail = ex.InnerException?.Message ?? ex.Message
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = ex.Message });
         }
     }
 
