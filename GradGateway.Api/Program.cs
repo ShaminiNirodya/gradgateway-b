@@ -161,7 +161,7 @@ if (builder.Environment.IsDevelopment())
         $"[Email config] Enabled={emailSection["Enabled"]}, User={smtpUser}, PasswordLength={smtpPassword?.Length ?? 0}");
 }
 
-// Register Services
+// Register Services //Dependency Injection (design pattern)
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 builder.Services.AddSingleton<IFirebaseAdminService, FirebaseAdminAuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
