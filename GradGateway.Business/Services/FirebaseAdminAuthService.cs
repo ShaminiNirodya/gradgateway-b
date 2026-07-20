@@ -45,6 +45,7 @@ public class FirebaseAdminAuthService : IFirebaseAdminService
         }
     }
 
+//Throws when Firebase admin is not configured.
     public async Task UpdatePasswordByEmailAsync(string email, string newPassword, CancellationToken cancellationToken = default)
     {
         if (!TryEnsureInitialized())

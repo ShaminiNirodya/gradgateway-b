@@ -32,6 +32,7 @@ public class UserService : IUserService
         _environment = environment;
     }
 
+//throw for invalid role, blocked account, or maintenance mode.
     public async Task<UserResponseDto?> GetOrCreateUserAsync(UserRegistrationDto dto)
     {
         var settings = await PlatformSettingsAccessor.GetOrCreateAsync(_context);

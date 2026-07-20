@@ -20,7 +20,7 @@ public class ProjectService : IProjectService
         var student = await GetStudentProfileAsync(firebaseUid);
         return await QueryProjectsForStudentAsync(student, excludeSeededDemo: true);
     }
-
+//Throws when a project is not found or a concurrency conflict happens.
     public async Task<List<ProjectResponseDto>> GetProjectsByStudentProfileIdAsync(string firebaseUid, Guid studentProfileId)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid)
