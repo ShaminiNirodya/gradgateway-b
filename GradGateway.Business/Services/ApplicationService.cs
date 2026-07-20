@@ -37,6 +37,7 @@ public class ApplicationService : IApplicationService
         _realtimeNotification = realtimeNotification;
     }
 
+//Throws when a student tries to apply to an expired or invalid opportunity.
     public async Task<ApplicationResponseDto> ApplyAsync(string firebaseUid, ApplyRequestDto dto)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid);
